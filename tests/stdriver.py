@@ -23,6 +23,7 @@
 #
 
 import getopt, os, sys, subprocess, re, json
+from shutil import rmtree
 
 # add directory in which script is located to python path
 # resolve any symlinks
@@ -37,6 +38,7 @@ milestone_test_file = "milestone.tst"
 basic_test_file = "basic.tst"
 advanced_test_file = "advanced.tst"
 reduced_test_file = "reduced.tst"
+temp_file_dir = "./.cush_temp_files"
 testfilter = None
 list_tests = False
 print_json = False
@@ -150,6 +152,15 @@ if list_tests:
 
 process_list = []
 
+# Create directory for temporary files
+# This will be used instead of potentially filling up /tmp
+try:
+    os.mkdir(temp_file_dir)
+except OSError:
+    pass
+except Exception as e:
+    print("Error creating temp file directory: " + e)
+
 #Run through each test set in the list
 for testset in full_testlist:
     print testset['name']
@@ -164,10 +175,12 @@ for testset in full_testlist:
 
         # augment PYTHONPATH so that our own version of pexpect and shellio
         # are picked up.
+        # additionally, TEMP is set so we don't make files in /tmp
         augmented_env = dict(os.environ)
         augmented_env['PYTHONPATH'] = ":".join([
             script_dir + "/../pexpect-dpty/", 
             script_dir])
+        augmented_env['TEMP'] = temp_file_dir
         
         # run test
         child_process = subprocess.Popen(["python2", testset['dir'] + testname, \
@@ -216,6 +229,12 @@ for testset in full_testlist:
         sum_points[testset['name']] = dict()
         sum_points[testset['name']]['points'] = testset_points_earned
         sum_points[testset['name']]['max'] = testset_points
+
+try:
+    rmtree(temp_file_dir)
+except Exception as e:
+    print e
+    pass
 
 # Write scores.json to the current (src) directory
 if (print_json):
