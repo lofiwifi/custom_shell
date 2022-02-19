@@ -44,11 +44,11 @@ sum_points = dict()
 
 def usage():
     print """
-Usage: python stdriver.py [options] [tests1.tst tests2.tst] ... 
+Usage: python stdriver.py [options] [tests1.tst tests2.tst] ...
     -b              Include basic tests
     -a              Include advanced tests
-    -v              Verbose 
-    -h              Show help 
+    -v              Verbose
+    -h              Show help
     -o outputspec   Run using this output spec file
     -t testname     Run only tests whose names contains 'testname'
     -B directory    Set test base (default %s)
@@ -71,6 +71,10 @@ for o, a in opts:
         usage()
         sys.exit()
     elif o in ("-t", "--test"):
+        if o not in ("-a") and o not in ("-b") and len(args) == 0:
+            print "You must specify where the test exists to use -t."
+            print "Example usage on a basic test: -vbt foreground"
+            sys.exit(1)
         testfilter = a
     elif o in ("-l"):
         list_tests = True
@@ -126,8 +130,8 @@ for testlist_filename in args:
 
         grps = re.match("^= (.+)", line)
         if grps:
-            testset = { 'name' : grps.group(1), 
-                        'tests' : [ ], 
+            testset = { 'name' : grps.group(1),
+                        'tests' : [ ],
                         'dir' : test_dir }
             full_testlist.append(testset)
         else:
@@ -154,11 +158,11 @@ process_list = []
 for testset in full_testlist:
     print testset['name']
     print '-------------------------'
-    
+
     #Run through each test in the set
     testresults = [ ]
     for (points, testname) in testset['tests']:
-    
+
         print str(points) + '\t' + testname + ':',
         sys.stdout.flush()
 
@@ -166,9 +170,9 @@ for testset in full_testlist:
         # are picked up.
         augmented_env = dict(os.environ)
         augmented_env['PYTHONPATH'] = ":".join([
-            script_dir + "/../pexpect-dpty/", 
+            script_dir + "/../pexpect-dpty/",
             script_dir])
-        
+
         # run test
         child_process = subprocess.Popen(["python2", testset['dir'] + testname, \
                              output_spec_file, plugin_directory],\
@@ -178,7 +182,7 @@ for testset in full_testlist:
 
         # build result list
         testresults.append((points, testname, child_process, test_passed))
-        
+
         #if: test passed
         if test_passed:
             print ' PASS'
@@ -195,7 +199,7 @@ for testset in full_testlist:
     #Run through each set of tests in the list
     testset_points = 0
     testset_points_earned = 0
-    
+
     #Run through each test in the set
     for (points, testname, child_process, test_passed) in testset['tests']:
         testset_points += points
@@ -205,9 +209,9 @@ for testset in full_testlist:
 
         print '\t%s\t%d/%d' % (testname, points_earned, points)
         testset_points_earned += points_earned
-            
+
     print '-------------------------'
-    
+
     print testset['name'] + '\t' + str(testset_points_earned) + '/' + \
                                                         str(testset_points)
 
