@@ -10,7 +10,7 @@ from tempfile import mkstemp
 import time
 
 setup_tests()
-   
+
 expect_prompt()
 
 sendline('sleep 10 | sleep 9')
@@ -46,7 +46,7 @@ expect_prompt()
 
 sendline('sleep 100 | sleep 99 | sleep 98 | sleep 97 &')
 expect_prompt()
-sendline('ps --ppid {0} -o pid,stat,cmd --no-headers'.format(get_shell_pid()))
+sendline('ps --ppid {0} -o pid,stat,comm --no-headers'.format(get_shell_pid()))
 
 count = 0
 while count < 4:
@@ -66,7 +66,7 @@ expect_prompt()
 run_builtin('stop', str(job.id))
 expect_prompt()
 
-sendline('ps --ppid {0} -o pid,stat,cmd --no-headers'.format(get_shell_pid()))
+sendline('ps --ppid {0} -o pid,stat,comm --no-headers'.format(get_shell_pid()))
 count = 0
 while count < 4:
     pid, stat, cmd = expect_regex('(\d+)\s+(\w)\s+(\w+)')
