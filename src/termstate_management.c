@@ -112,3 +112,13 @@ termstate_sample(void)
 {
     termstate_save(&saved_tty_state);
 }
+
+pid_t
+termstate_get_current_terminal_owner(void)
+{
+    pid_t rc = tcgetpgrp(termstate_get_tty_fd());
+    if (rc == -1)
+        utils_fatal_error("tcgetpgrp: ");
+
+    return rc;
+}

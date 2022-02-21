@@ -43,4 +43,7 @@ void termstate_give_terminal_back_to_shell(void);
 /* Get a file descriptor that refers to controlling terminal */
 int termstate_get_tty_fd(void);
 
+/* Return the process group id of the current terminal owner */
+pid_t termstate_get_current_terminal_owner(void);
+
 #endif /* __TERMSTATE_MANAGEMENT_H */

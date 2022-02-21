@@ -276,6 +276,22 @@ main(int ac, char *av[])
     /* Read/eval loop. */
     for (;;) {
 
+        /* If you fail this assertion, you were about to enter readline()
+         * while SIGCHLD is blocked.  This means that your shell would be
+         * unable to receive SIGCHLD signals, and thus would be unable to
+         * wait for background jobs that may finish while the
+         * shell is sitting at the prompt waiting for user input.
+         */
+        assert(!signal_is_blocked(SIGCHLD));
+
+        /* If you fail this assertion, you were about to call readline()
+         * without having terminal ownership.
+         * This would lead to the suspension of your shell with SIGTTOU.
+         * Make sure that you call termstate_give_terminal_back_to_shell()
+         * before returning here on all paths.
+         */
+        assert(termstate_get_current_terminal_owner() == getpgrp());
+
         /* Do not output a prompt unless shell's stdin is a terminal */
         char * prompt = isatty(0) ? build_prompt() : NULL;
         char * cmdline = readline(prompt);
