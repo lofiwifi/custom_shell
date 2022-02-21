@@ -105,6 +105,10 @@ if not os.access(output_spec_file, os.R_OK):
 
 full_testlist = []
 if len(args) == 0:
+    if testfilter != None:
+        print ('You tried to use -t {0} but you didn\'t specify in which test set to look for this test'.format(testfilter))
+        print ('Please provide -a, -b, or the name of a .tst file that contains {0}'.format(testfilter))
+
     usage()
     sys.exit(1)
 

@@ -4,37 +4,38 @@ from tempfile import mkstemp
 setup_tests()
     
 _, tmpfile = mkstemp()
-testdata = 'this is a simple test'
-with open(tmpfile, 'w') as fd:
-    fd.write(testdata)
+try:
+    testdata = 'this is a simple test'
+    with open(tmpfile, 'w') as fd:
+        fd.write(testdata)
 
-message = '''Simple IO redirect input test.
-Sets up a tmp file and writes to it, makes sure your output matches.
-cat < tmpfile
-rev < tmpfile
+    message = '''Simple IO redirect input test.
+    Sets up a tmp file and writes to it, makes sure your output matches.
+    cat < tmpfile
+    rev < tmpfile
 
-Overwrite file
-wc -c < tmpfile
-'''
+    Overwrite file
+    wc -c < tmpfile
+    '''
 
-sendline('cat < {0}'.format(tmpfile))
-expect(testdata, message)
+    sendline('cat < {0}'.format(tmpfile))
+    expect(testdata, message)
 
-sendline('rev < {0}'.format(tmpfile))
-expect('tset elpmis a si siht', message)
+    sendline('rev < {0}'.format(tmpfile))
+    expect('tset elpmis a si siht', message)
 
-with open(tmpfile) as fd:
-    assert fd.read() == 'this is a simple test'
+    with open(tmpfile) as fd:
+        assert fd.read() == 'this is a simple test'
 
-with open(tmpfile, 'w') as fd:
-    fd.write('overwrite')
+    with open(tmpfile, 'w') as fd:
+        fd.write('overwrite')
 
-sendline('wc < {0}'.format(tmpfile))
-expect(tmpfile)
-expect_regex(r'(0)\s+(1)\s+(9)')
+    sendline('wc < {0}'.format(tmpfile))
+    expect(tmpfile)
+    expect_regex(r'(0)\s+(1)\s+(9)')
 
-
-os.unlink(tmpfile)
+finally:
+    removefile(tmpfile)
 
 message = '''Test that file descriptors are not leaked into child
 processes. Only the file descriptors 0, 1, and 2 (stdin, stdout, stderr)

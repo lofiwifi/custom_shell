@@ -56,21 +56,23 @@ killed'
 
 exe = make_test_program(open(os.path.dirname(__file__) + "/blocks_sigint.c").read())
 
-sendline('{0}'.format(exe))
-childpid = proc_check.count_children_timeout(console, 1, 1)
-sendintr()
-time.sleep(1)
-proc_check.count_children_timeout(console, 1, 1)
-assert os.path.exists("/proc/%d/stat" % childpid[0]), \
-    'process that blocks SIGINT should not have been killed - is your shell relaying SIGINT?'
+try:
+    sendline('{0}'.format(exe))
+    childpid = proc_check.count_children_timeout(console, 1, 1)
+    sendintr()
+    time.sleep(1)
+    proc_check.count_children_timeout(console, 1, 1)
+    assert os.path.exists("/proc/%d/stat" % childpid[0]), \
+        'process that blocks SIGINT should not have been killed - is your shell relaying SIGINT?'
 
-os.kill(childpid[0], signal.SIGKILL) 
-time.sleep(.5)
-assert not os.path.exists("/proc/%d/stat" % childpid[0]), \
-    'the process was not killed'
-expect_prompt("Shell did not print expected prompt (4)")
+    os.kill(childpid[0], signal.SIGKILL) 
+    time.sleep(.5)
+    assert not os.path.exists("/proc/%d/stat" % childpid[0]), \
+        'the process was not killed'
+    expect_prompt("Shell did not print expected prompt (4)")
 
-os.unlink(exe)
+finally:
+    removefile(exe)
 
 sendline("exit");
 

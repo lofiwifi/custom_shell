@@ -6,7 +6,7 @@
 #
 #####
 
-import sys, imp, atexit
+import sys, imp, atexit, errno
 import os, re, time, pexpect, tempfile, proc_check, shutil, stat, signal, traceback
 from collections import namedtuple
 
@@ -52,9 +52,6 @@ def setup_tests(additional_cmdline_arguments = []):
     global console
     global settings_module
     
-    if not os.access(".tmp", os.R_OK | os.X_OK):
-        os.mkdir(".tmp", 0755)
-    os.environ["TEMP"] = ".tmp"
     definitions_scriptname = sys.argv[1]
     settings_module = imp.load_source('', definitions_scriptname)
     logfile = None
@@ -66,7 +63,7 @@ def setup_tests(additional_cmdline_arguments = []):
     atexit.register(kill, shell_process=console)
 
     # set timeout for all following 'expect*' calls to 2 seconds
-    console.timeout = 2 
+    console.timeout = 2
     return console
 
 
@@ -140,13 +137,23 @@ def assert_correct_fds(pid, message):
 def get_shell_pid():
     return console.pid
 
-def make_test_program(src):
+def make_test_program(src, cflags="-O2"):
     exefile, exefilename = tempfile.mkstemp()
     os.close(exefile)
     ofile, ofilename = tempfile.mkstemp(suffix=".c")
     os.write(ofile, src)
     os.close(ofile)
-    os.system("gcc %s -o %s" % (ofilename, exefilename))
+    os.system("gcc %s %s -o %s" % (cflags, ofilename, exefilename))
     os.unlink(ofilename)
     return exefilename
+
+def removefile(filename):
+    """
+    Remove this file if it exists
+    """
+    try:
+        os.unlink(filename)
+    except OSError as e:
+        if e.errno != errno.ENOENT:
+            raise
 

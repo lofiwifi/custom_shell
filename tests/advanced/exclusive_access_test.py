@@ -24,21 +24,23 @@ def expect_stopped(command):
 
 expect_prompt()
 _, tmpfile = mkstemp()
-# Start nano
-sendline('nano {0}'.format(tmpfile))
-wait_for_fg_child()
+try:
+    # Start nano
+    sendline('nano {0}'.format(tmpfile))
+    wait_for_fg_child()
 
-# Quit out to make sure nano can read keys
-sendline('test that it works')
-time.sleep(0.5)
-sendcontrol('x')
-time.sleep(0.5)
-sendline('y\r')
-expect_prompt()
+    # Quit out to make sure nano can read keys
+    sendline('test that it works')
+    time.sleep(0.5)
+    sendcontrol('x')
+    time.sleep(0.5)
+    sendline('y\r')
+    expect_prompt()
 
-with open(tmpfile) as fd:
-    assert 'test that it works' in fd.read()
-os.unlink(tmpfile)
+    with open(tmpfile) as fd:
+        assert 'test that it works' in fd.read()
+finally:
+    removefile(tmpfile)
 
 
 # Assert that the shell has regained control

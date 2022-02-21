@@ -8,33 +8,35 @@ expect_prompt()
 tmpfile = '/tmp/{0}.{1}.txt'.format(int(time.time() * 1000),
                                     os.getuid())
 
-sendline('echo hi > {0}'.format(tmpfile))
-expect_prompt()
+try:
+    sendline('echo hi > {0}'.format(tmpfile))
+    expect_prompt()
 
-with open(tmpfile) as fd:
-    data = fd.read()
-    assert 'hi' in data
-
-
-sendline('echo hello > {0}'.format(tmpfile))
-expect_prompt()
-
-with open(tmpfile) as fd:
-    data = fd.read()
-    assert 'hi' not in data
-    assert 'hello' in data
+    with open(tmpfile) as fd:
+        data = fd.read()
+        assert 'hi' in data
 
 
-os.unlink(tmpfile)
-sendline('echo create this > {0}'.format(tmpfile))
-expect_prompt()
+    sendline('echo hello > {0}'.format(tmpfile))
+    expect_prompt()
 
-with open(tmpfile) as fd:
-    data = fd.read()
-    assert 'hello' not in data
-    assert 'create this' in data
+    with open(tmpfile) as fd:
+        data = fd.read()
+        assert 'hi' not in data
+        assert 'hello' in data
 
-os.unlink(tmpfile)
+
+    removefile(tmpfile)
+    sendline('echo create this > {0}'.format(tmpfile))
+    expect_prompt()
+
+    with open(tmpfile) as fd:
+        data = fd.read()
+        assert 'hello' not in data
+        assert 'create this' in data
+
+finally:
+    removefile(tmpfile)
 
 message = '''Test that file descriptors are not leaked into child
 processes. Only the file descriptors 0, 1, and 2 (stdin, stdout, stderr)

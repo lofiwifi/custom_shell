@@ -15,15 +15,16 @@ expect_prompt()
 
 _, tmpfile = mkstemp()
 
-exe = make_test_program(open(os.path.dirname(__file__) + "/writetostderr.c").read())
-sendline('{0} |& cat > {1}'.format(exe, tmpfile))
-expect_prompt()
-os.unlink(exe)
+try:
+    exe = make_test_program(open(os.path.dirname(__file__) + "/writetostderr.c").read())
+    sendline('{0} |& cat > {1}'.format(exe, tmpfile))
+    expect_prompt()
 
-with open(tmpfile) as fd:
-    content = fd.read()
-    assert 'stderr\nstdout\n' == content
-
-os.unlink(tmpfile)
+    with open(tmpfile) as fd:
+        content = fd.read()
+        assert 'stderr\nstdout\n' == content
+finally:
+    removefile(exe)
+    removefile(tmpfile)
 
 test_success()
