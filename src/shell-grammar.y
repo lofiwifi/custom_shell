@@ -159,20 +159,24 @@ cmd_list:	/* Null Command */ { $$ = ast_command_line_create_empty(); }
 |		cmd_list ';'
 |		cmd_list '&' {
             $$ = $1;
-            struct ast_pipeline * last;
-            last = list_entry(list_back(&$1->pipes), 
-                              struct ast_pipeline, elem);
-            last->bg_job = true;
+            if (!list_empty(&$1->pipes)) {
+                struct ast_pipeline * last;
+                last = list_entry(list_back(&$1->pipes),
+                                  struct ast_pipeline, elem);
+                last->bg_job = true;
+            }
         }
 |		cmd_list ';' ast_pipeline	{ 
             $$ = $1;
             list_push_back(&$$->pipes, &$3->elem);
         }
 |		cmd_list '&' ast_pipeline	{ 
-            struct ast_pipeline * last;
-            last = list_entry(list_back(&$1->pipes), 
-                              struct ast_pipeline, elem);
-            last->bg_job = true;
+            if (!list_empty(&$1->pipes)) {
+                struct ast_pipeline * last;
+                last = list_entry(list_back(&$1->pipes),
+                                  struct ast_pipeline, elem);
+                last->bg_job = true;
+            }
 
             $$ = $1;
             list_push_back(&$$->pipes, &$3->elem);
