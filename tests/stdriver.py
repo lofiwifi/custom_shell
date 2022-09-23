@@ -50,7 +50,9 @@ Usage: python stdriver.py [options] [tests1.tst tests2.tst] ...
     -v              Verbose 
     -h              Show help 
     -o outputspec   Run using this output spec file
-    -t testname     Run only tests whose names contains 'testname'
+    -t testname     Run only tests whose names contains 'testname' 
+                    (must include -a, -b, or the name of your custom 
+                     test file before this option.)
     -B directory    Set test base (default %s)
     -l              List available tests in test set
     """ % (test_base)
