@@ -7,7 +7,7 @@ from testutils import *
 exe = make_test_program(open(os.path.dirname(__file__) + "/ts_test.c").read())
 
 try:
-    setup_tests()
+    console = setup_tests()
     expect_prompt()
 
     sendline('{0}'.format(exe))
@@ -18,8 +18,12 @@ try:
 
     run_builtin('fg', str(job.id))
     expect('Job now continuing...', 'continue ts_test')
+    expect('Verified that the shell saved and restored successfully.')
+    expect('Successfully restored original terminal state.')
 
     expect_prompt()
+    output = console.before
+    assert 'Aborted' not in output, output
 
 finally:
     removefile(exe)

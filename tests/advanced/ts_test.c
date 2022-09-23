@@ -48,9 +48,11 @@ main()
     }
 
     assert (saved_tty_state.c_cc[VEOF] == CTRL_E);       // ^E
+    printf("Verified that the shell saved and restored successfully.\n");
 
     // now restore it the way it was
     saved_tty_state.c_cc[VEOF] = CTRL_D;                 // ^D
     rc = tcsetattr(terminal_fd, TCSANOW, &saved_tty_state);
     assert (rc == 0);
+    printf("Successfully restored original terminal state.\n");
 }
