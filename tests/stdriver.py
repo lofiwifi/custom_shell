@@ -137,7 +137,7 @@ for testlist_filename in args:
                         'dir' : test_dir }
             full_testlist.append(testset)
         else:
-            grps = re.match("(\d+) (.+)", line)
+            grps = re.match("(\d+)\s+(\S+)\s*", line)
             if grps:
                 points, testname = int(grps.group(1)), grps.group(2)
                 if not testfilter or testname.find(testfilter) != -1:
