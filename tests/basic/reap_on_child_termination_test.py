@@ -21,7 +21,7 @@
 # [jobid] pid
 #
 
-import sys, imp, atexit, pexpect, proc_check, signal, time, threading, termios
+import sys, imp, atexit, pexpect, proc_check, signal, time, threading
 from testutils import *
 
 console = setup_tests()
@@ -60,21 +60,6 @@ sendline(dne)
 console.ignorecase = True
 expect(dne)
 expect('no such file or directory')
-
-# A number of students are wrongly sampling the terminal state when
-# the background "sleep 2" process earlier exited, and in the course of
-# doing so pick up a terminal state active while readline() is being called.
-#
-# Help them by looking at the terminal state here.
-iflag, oflag, cflag, lflag, ispeed, ospeed, cc  = termios.tcgetattr(console.child_fd)
-
-# Typically they end up turning off ECHO, which would make the final
-# expect_exact fail in a confusing way.
-if oflag & termios.ECHO == 0:
-    raise Exception("the terminal state is corrupted, read explanation in test")
-# -> Remember to sample the terminal state only when a foreground process
-# exits, and then only when it exits with EXIT_SUCCESS <-
-#
 
 sendline("exit");
 
