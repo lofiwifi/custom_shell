@@ -5,5 +5,5 @@ int
 main()
 {
     signal(SIGTSTP, SIG_IGN);
-    while (1);
+    sleep(5);
 }

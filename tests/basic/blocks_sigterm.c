@@ -5,5 +5,5 @@ int
 main()
 {
     signal(SIGTERM, SIG_IGN);
-    sleep(100);
+    sleep(5);
 }
