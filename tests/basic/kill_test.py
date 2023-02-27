@@ -74,7 +74,21 @@ try:
 finally:
     removefile(exe)
 
-sendline("exit");
+try:
+    exe = make_test_program(open(os.path.dirname(__file__) + "/blocks_sigterm.c").read())
+    sendline('{0} &'.format(exe))
+    (jobid, pid) = parse_bg_status()
+    # send the stop command to the process
+    run_builtin('kill', jobid)
+    time.sleep(.5)
+    assert os.path.exists("/proc/%d/stat" % int(pid)), \
+        'process that blocks SIGTERM should not have been killed - is your shell relaying SIGKILL?'
+    os.kill(int(pid), signal.SIGKILL)
+finally:
+    removefile(exe)
+expect_prompt("Shell did not print expected prompt (5)")
+
+sendline("exit")
 
 # ensure that no extra characters are output after exiting
 expect_exact("exit\r\n", "Shell output extraneous characters")

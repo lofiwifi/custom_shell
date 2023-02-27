@@ -42,11 +42,27 @@ assert not proc_check.check_pid_fgpgrp(pid), \
                             'Error: process is in the foreground'
 assert proc_check.check_pid_status(pid, 'T'), 'Error: process not stopped'
 
+os.kill(int(pid), signal.SIGKILL)
+
 #check the prompt prints
 expect_prompt("Shell did not print expected prompt (3)")
 
+try:
+    exe = make_test_program(open(os.path.dirname(__file__) + "/blocks_sigtstp.c").read())
+    sendline('{0} &'.format(exe))
+    (jobid, pid) = parse_bg_status()
+    # send the stop command to the process
+    run_builtin('stop', jobid)
+    time.sleep(.5)
+    sendline('ps --ppid {0} -o pid,stat,comm --no-headers'.format(get_shell_pid()))
+    pid, stat, cmd = expect_regex('(\d+)\s+(\w)\s+(\w+)')
+    assert stat == 'T', 'Error: process not stopped.  Is your shell sending SIGTSTP instead of SIGSTOP?'
+    os.kill(int(pid), signal.SIGKILL)
+finally:
+    removefile(exe)
+expect_prompt("Shell did not print expected prompt (4)")
 
-sendline("exit");
+sendline("exit")
 expect_exact("exit\r\n", "Shell output extraneous characters")
 
 test_success()
