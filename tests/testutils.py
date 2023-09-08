@@ -6,13 +6,13 @@
 #
 #####
 
-import sys, imp, atexit, errno
+import sys, atexit, errno
 import os, re, time, pexpect, tempfile, proc_check, shutil, stat, signal, traceback
 from collections import namedtuple
 
 def test_success(msg = "", exit = True):
     """Print PASS message and optionally 'msg'.  Exit unless 'exit is False"""
-    print "PASS", msg
+    print ("PASS", msg)
     if exit:
         sys.exit(0)
 
@@ -38,9 +38,9 @@ def handle_exception(type, exc, tb):
     report that the test failed because of a timeout and exit.
     """
     if type == pexpect.TIMEOUT:
-        print "\n>>> FAIL: Test timed out", exc.get_trace(), "\n"
+        print ("\n>>> FAIL: Test timed out", exc.get_trace(), "\n")
     else:
-        print "\n>>> FAIL: ", type, "'", exc, "'\n"
+        print ("\n>>> FAIL: ", type, "'", exc, "'\n")
     traceback.print_tb(tb)
 
 sys.excepthook = handle_exception
@@ -68,7 +68,7 @@ def setup_tests(additional_cmdline_arguments = []):
 
 
 def sendline(line):
-    console.sendline(line)
+    console.sendline(line.encode())
 
 def sendcontrol(ch):
     console.sendcontrol(ch)
@@ -141,7 +141,7 @@ def make_test_program(src, cflags="-O2"):
     exefile, exefilename = tempfile.mkstemp()
     os.close(exefile)
     ofile, ofilename = tempfile.mkstemp(suffix=".c")
-    os.write(ofile, src)
+    os.write(ofile, src.encode())
     os.close(ofile)
     os.system("gcc %s %s -o %s" % (cflags, ofilename, exefilename))
     os.unlink(ofilename)

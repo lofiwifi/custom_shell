@@ -55,4 +55,4 @@ builtin_commands = {
 # Uncomment this line if you like stdriver.py to keep a log of everything
 # input and output to the pty in file 'log.txt'
 #
-logfile=open("log.txt", "w")
+logfile=open("log.txt", "wb")

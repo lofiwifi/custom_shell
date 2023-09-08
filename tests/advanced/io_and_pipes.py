@@ -51,7 +51,7 @@ try:
     expect_prompt()
 
     with open(tmpout) as fd:
-        lines = map(lambda x: x.strip(), fd.readlines())
+        lines = [x.strip() for x in fd.readlines()]
         assert lines == 'a hcnub si fo siht sdrow'.split()
 
     removefile(tmpfile)

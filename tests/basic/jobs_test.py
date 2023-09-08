@@ -9,7 +9,7 @@
 #	jobs, ctrl-z control, ctrl-c control, sleep, fg, clear
 #
 
-import sys, imp, atexit, pexpect, proc_check, signal, time, threading
+import sys, atexit, pexpect, proc_check, signal, time, threading
 from testutils import *
 
 console = setup_tests()

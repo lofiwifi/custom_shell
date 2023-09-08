@@ -4,7 +4,7 @@
 # This is the very first test you should pass
 # 
 
-import sys, imp, atexit, pexpect, proc_check, signal, time
+import sys, atexit, pexpect, proc_check, signal, time
 from testutils import *
 
 console = setup_tests()

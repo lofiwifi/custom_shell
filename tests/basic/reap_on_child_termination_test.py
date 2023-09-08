@@ -21,7 +21,7 @@
 # [jobid] pid
 #
 
-import sys, imp, atexit, pexpect, proc_check, signal, time, threading, termios
+import sys, atexit, pexpect, proc_check, signal, time, threading, termios
 from testutils import *
 
 console = setup_tests()

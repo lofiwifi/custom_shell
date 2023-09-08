@@ -1,4 +1,4 @@
-#!/usr/bin/python2
+#!/usr/bin/python3
 #
 # Script: stdriver.py
 # Author: Patrick Boyd
@@ -43,7 +43,7 @@ print_json = False
 sum_points = dict()
 
 def usage():
-    print """
+    print (f"""
 Usage: python stdriver.py [options] [tests1.tst tests2.tst] ... 
     -b              Include basic tests
     -a              Include advanced tests
@@ -53,16 +53,16 @@ Usage: python stdriver.py [options] [tests1.tst tests2.tst] ...
     -t testname     Run only tests whose names contains 'testname' 
                     (must include -a, -b, or the name of your custom 
                      test file before this option.)
-    -B directory    Set test base (default %s)
+    -B directory    Set test base (default {test_base})
     -l              List available tests in test set
-    """ % (test_base)
+    """)
 
 try:
     opts, args = getopt.getopt(sys.argv[1:], "hvmbjo:p:t:B:al", \
         ["help", "outputspec=", "test="])
-except getopt.GetoptError, err:
+except getopt.GetoptError as err:
     # print help information and exit:
-    print str(err) # will print something like "option -a not recognized"
+    print (str(err)) # will print something like "option -a not recognized"
     usage()
     sys.exit(2)
 
@@ -94,22 +94,22 @@ for o, a in opts:
         assert False, "unhandled option"
 
 if plugin_directory != "" and not os.access(plugin_directory, os.R_OK):
-    print "Directory ", plugin_directory, " is not readable"
-    print "You must create this plugin directory if you wish to test plugins"
+    print (f"Directory {plugin_directory} is not readable")
+    print ("You must create this plugin directory if you wish to test plugins")
     sys.exit(1)
 else:
     plugin_directory = " -p " + plugin_directory
 
 if not os.access(output_spec_file, os.R_OK):
-    print "File ", output_spec_file, " is not readable"
-    print "You must create this file and adapt it to match the output of your shell"
+    print (f"File {output_spec_file} is not readable")
+    print ("You must create this file and adapt it to match the output of your shell")
     sys.exit(1)
 
 full_testlist = []
 if len(args) == 0:
     if testfilter != None:
-        print ('You tried to use -t {0} but you didn\'t specify in which test set to look for this test'.format(testfilter))
-        print ('Please provide -a, -b, or the name of a .tst file that contains {0}'.format(testfilter))
+        print (f'You tried to use -t {testfilter} but you didn\'t specify in which test set to look for this test')
+        print (f'Please provide -a, -b, or the name of a .tst file that contains {testfilter}')
 
     usage()
     sys.exit(1)
@@ -123,7 +123,7 @@ for testlist_filename in args:
         else:
             test_dir = test_dir + '/'
     except:
-        print 'Error: Tests list file: ''%s'' could not be opened.'% testlist_filename
+        print (f'Error: Tests list file: ''{testlist_filename}'' could not be opened.')
         sys.exit(-1)
 
     #File input, read in the test filenames
@@ -148,9 +148,9 @@ for testlist_filename in args:
 # print full_testlist
 if list_tests:
     for testset in full_testlist:
-        print testset['name']
+        print (testset['name'])
         for (points, testname) in testset['tests']:
-            print ("{} pts {}".format(points, testname))
+            print (f"{points} pts {testname}")
 
     sys.exit()
 
@@ -158,14 +158,14 @@ process_list = []
 
 #Run through each test set in the list
 for testset in full_testlist:
-    print testset['name']
-    print '-------------------------'
+    print (testset['name'])
+    print ('-------------------------')
     
     #Run through each test in the set
     testresults = [ ]
     for (points, testname) in testset['tests']:
     
-        print str(points) + '\t' + testname + ':',
+        print (f'{points}\t{testname}:', end="")
         sys.stdout.flush()
 
         # augment PYTHONPATH so that our own version of pexpect and shellio
@@ -176,7 +176,7 @@ for testset in full_testlist:
             script_dir])
         
         # run test
-        child_process = subprocess.Popen(["python2", testset['dir'] + testname, \
+        child_process = subprocess.Popen(["python3", testset['dir'] + testname, \
                              output_spec_file, plugin_directory],\
                              env=augmented_env,\
                              stderr=subprocess.PIPE, stdout=subprocess.PIPE)
@@ -187,10 +187,10 @@ for testset in full_testlist:
         
         #if: test passed
         if test_passed:
-            print ' PASS'
+            print (' PASS')
         else:
-            print ' FAIL'
-    print ""
+            print (' FAIL')
+    print ()
     testset['tests'] = testresults
 
 
@@ -209,13 +209,13 @@ for testset in full_testlist:
         if not test_passed:
             points_earned = 0
 
-        print '\t%s\t%d/%d' % (testname, points_earned, points)
+        print ('\t%s\t%d/%d' % (testname, points_earned, points))
         testset_points_earned += points_earned
             
-    print '-------------------------'
+    print ('-------------------------')
     
-    print testset['name'] + '\t' + str(testset_points_earned) + '/' + \
-                                                        str(testset_points)
+    print (testset['name'] + '\t' + str(testset_points_earned) + '/' + \
+                                                        str(testset_points))
 
     # Gather score info for json output if necessary
     if (print_json):
@@ -234,12 +234,12 @@ if (print_json):
 #Verbose printing.  If the verbose option was enabled, print the error
 #information from the tests that failed.
 if verbose:
-    print '\nError Output'
-    print '-------------------------'
+    print ('\nError Output')
+    print ('-------------------------')
     for testset in full_testlist:
         for (points, testname, child_process, test_passed) in testset['tests']:
             if not test_passed:
-                print testname + ':'
+                print (testname + ':')
                 (stdout, stderr) = child_process.communicate()
-                print stdout, stderr
+                print (stdout, stderr)
 

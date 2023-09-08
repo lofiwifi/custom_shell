@@ -16,7 +16,7 @@
 # This is the very first test you should pass
 # 
 
-import sys, imp, atexit, pexpect, proc_check, signal, time, os
+import sys, atexit, pexpect, proc_check, signal, time, os
 from testutils import *
 
 console = setup_tests()
@@ -25,7 +25,7 @@ console = setup_tests()
 expect_prompt()
 
 # run a non-existent command
-console.sendline("this_command_does_not_exist")
+sendline("this_command_does_not_exist")
 
 time.sleep(1)
 # this should fail somehow and not leave any children behind

@@ -14,7 +14,7 @@ c = setup_tests()
 expect_prompt()
 
 # should sample when a job exits
-veof = lambda: termios.tcgetattr(c.child_fd)[-1][termios.VEOF]
+veof = lambda: termios.tcgetattr(c.child_fd)[-1][termios.VEOF].decode()
 assert veof() == ctrl('d')
 
 sendline('stty eof ^E')
