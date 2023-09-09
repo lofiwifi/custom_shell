@@ -6,7 +6,7 @@
 #
 #####
 
-import sys, atexit, errno
+import sys, imp, atexit, errno
 import os, re, time, pexpect, tempfile, proc_check, shutil, stat, signal, traceback
 from collections import namedtuple
 
