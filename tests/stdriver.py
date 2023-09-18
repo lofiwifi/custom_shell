@@ -241,5 +241,8 @@ if verbose:
             if not test_passed:
                 print (testname + ':')
                 (stdout, stderr) = child_process.communicate()
-                print (stdout, stderr)
+                try:
+                    print (stdout.decode(), stderr.decode())
+                except UnicodeDecodeError:
+                    print (stdout, stderr)
 
