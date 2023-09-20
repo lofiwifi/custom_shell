@@ -123,7 +123,7 @@ for testlist_filename in args:
         else:
             test_dir = test_dir + '/'
     except:
-        print (f'Error: Tests list file: ''{testlist_filename}'' could not be opened.')
+        print (f'Error: Tests list file: {testlist_filename} could not be opened.')
         sys.exit(-1)
 
     #File input, read in the test filenames
