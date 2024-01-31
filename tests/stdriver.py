@@ -52,7 +52,7 @@ Usage: python stdriver.py [options] [tests1.tst tests2.tst] ...
     -o outputspec   Run using this output spec file
     -t testname     Run only tests whose names contains 'testname' 
                     (must include -a, -b, or the name of your custom 
-                     test file before this option.)
+                     test file with this option.)
     -B directory    Set test base (default {test_base})
     -l              List available tests in test set
     """)
