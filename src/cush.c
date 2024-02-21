@@ -66,9 +66,9 @@ struct job {
     /* Add additional fields here if needed. */
 };
 
-struct pid_list_elem {
-    struct list_elem elem; /* Link element for pids list. */
+struct pid {
     pid_t pid;             /* PID stored within wrapper struct. */
+    struct list_elem elem; /* Link element for pids list. */
 };
 
 /* Utility functions for job list management.
@@ -98,6 +98,7 @@ add_job(struct ast_pipeline *pipe)
     struct job * job = malloc(sizeof *job);
     job->pipe = pipe;
     job->num_processes_alive = 0;
+    list_init(&job->pids);
     list_push_back(&job_list, &job->elem);
     for (int i = 1; i < MAXJOBS; i++) {
         if (jid2job[i] == NULL) {
@@ -114,18 +115,15 @@ add_job(struct ast_pipeline *pipe)
 /* Adds a pid to the end of the pid list of the given job. Initializes this list if necessary. 
    Assumes that the given PID is active, so it increases the num_processes_alive field. */
 static void add_pid_to_job(pid_t pid, struct job* job) {
-    if (job->num_processes_alive == 0 && &job->pids == NULL) {
-        list_init(&job->pids);
-    }
-    struct pid_list_elem pid_elem;
-    pid_elem.pid = pid;
-    list_push_back(&job->pids, &pid_elem.elem);
+    struct pid* pid_str = malloc(sizeof(struct pid));
+    pid_str->pid = pid;
+    list_push_back(&job->pids, &pid_str->elem);
     job->num_processes_alive++;
 }
 
 /* Iterates through the current job list and each job list's pid list to find the job
    belonging to the given pid. */
-struct job* find_job_of_pid(pid_t pid) {
+struct job* find_job_of_pid(pid_t g_pid) {
 
     // Iterates through every job in the list
     for (struct list_elem* job_elem = list_begin(&job_list); job_elem != list_end(&job_list); job_elem = list_next(job_elem)) {
@@ -133,7 +131,7 @@ struct job* find_job_of_pid(pid_t pid) {
         // Iterates through every pid in the pid list of the job
         struct job* job = list_entry(job_elem, struct job, elem);
         for (struct list_elem* pid_elem = list_begin(&job->pids); pid_elem != list_end(&job->pids); pid_elem = list_next(pid_elem)) {
-            if (pid == list_entry(pid_elem, struct pid_list_elem, elem)->pid) {
+            if (list_entry(pid_elem, struct pid, elem)->pid == g_pid) {
                 return job;
             }
         }
@@ -149,6 +147,11 @@ struct job* find_job_of_pid(pid_t pid) {
 static void
 delete_job(struct job *job)
 {
+    // Frees internal job PID list.
+    for (struct list_elem* e = list_begin(&job->pids); e != list_end(&job->pids); e = list_next(e)) {
+        free(list_entry(e, struct pid, elem));
+    }
+
     int jid = job->jid;
     assert(jid != -1);
     jid2job[jid]->jid = -1;
@@ -287,6 +290,12 @@ handle_child_status(pid_t pid, int status)
         return;
     }
 
+    if (WIFEXITED(status)) {
+        job->status = STOPPED;
+        job->num_processes_alive--;
+        termstate_sample();
+        termstate_give_terminal_back_to_shell();
+    }
 
     /* To be implemented. 
      * Step 1. Given the pid, determine which job this pid is a part of
@@ -310,8 +319,8 @@ handle_child_status(pid_t pid, int status)
 void execute_command_line(struct ast_command_line* cline) {
     // Iterates through the list of pipelines.
     for (struct list_elem* pList = list_begin(&cline->pipes); pList != list_end(&cline->pipes); pList = list_next(pList)) { 
-        
         // Adds a job for each pipeline.
+        signal_block(SIGCHLD);
         struct ast_pipeline* pipe = list_entry(pList, struct ast_pipeline, elem);
         struct job* job = add_job(pipe);
 
@@ -332,7 +341,10 @@ void execute_command_line(struct ast_command_line* cline) {
         }
         // Waits for the current pipeline to finish. Calls handle_child_status().
         wait_for_job(job);
+        signal_unblock(SIGCHLD);
     }
+
+    
 }
 
 int
