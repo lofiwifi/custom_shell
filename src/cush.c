@@ -24,6 +24,8 @@
 #include "utils.h"
 
 static void handle_child_status(pid_t pid, int status);
+void execute_command_line(struct ast_command_line*);
+struct job* find_job_of_pid(pid_t pid);
 
 static void
 usage(char *progname)
@@ -52,6 +54,7 @@ enum job_status {
 };
 
 struct job {
+    struct list /*<pid_t>*/ pids;
     struct list_elem elem;   /* Link element for jobs list. */
     struct ast_pipeline *pipe;  /* The pipeline of commands this job represents */
     int     jid;             /* Job id. */
@@ -61,6 +64,11 @@ struct job {
                                         stopped after having been in foreground */
 
     /* Add additional fields here if needed. */
+};
+
+struct pid_list_elem {
+    struct list_elem elem; /* Link element for pids list. */
+    pid_t pid;             /* PID stored within wrapper struct. */
 };
 
 /* Utility functions for job list management.
@@ -100,6 +108,37 @@ add_job(struct ast_pipeline *pipe)
     }
     fprintf(stderr, "Maximum number of jobs exceeded\n");
     abort();
+    return NULL;
+}
+
+/* Adds a pid to the end of the pid list of the given job. Initializes this list if necessary. 
+   Assumes that the given PID is active, so it increases the num_processes_alive field. */
+static void add_pid_to_job(pid_t pid, struct job* job) {
+    if (job->num_processes_alive == 0 && &job->pids == NULL) {
+        list_init(&job->pids);
+    }
+    struct pid_list_elem pid_elem;
+    pid_elem.pid = pid;
+    list_push_back(&job->pids, &pid_elem.elem);
+    job->num_processes_alive++;
+}
+
+/* Iterates through the current job list and each job list's pid list to find the job
+   belonging to the given pid. */
+struct job* find_job_of_pid(pid_t pid) {
+
+    // Iterates through every job in the list
+    for (struct list_elem* job_elem = list_begin(&job_list); job_elem != list_end(&job_list); job_elem = list_next(job_elem)) {
+
+        // Iterates through every pid in the pid list of the job
+        struct job* job = list_entry(job_elem, struct job, elem);
+        for (struct list_elem* pid_elem = list_begin(&job->pids); pid_elem != list_end(&job->pids); pid_elem = list_next(pid_elem)) {
+            if (pid == list_entry(pid_elem, struct pid_list_elem, elem)->pid) {
+                return job;
+            }
+        }
+    }
+
     return NULL;
 }
 
@@ -237,12 +276,17 @@ wait_for_job(struct job *job)
     }
 }
 
-
-
 static void
 handle_child_status(pid_t pid, int status)
 {
     assert(signal_is_blocked(SIGCHLD));
+
+    struct job* job = find_job_of_pid(pid);
+    if (job == NULL) {
+        printf("ERROR: given PID is not associated with a job.\n");
+        return;
+    }
+
 
     /* To be implemented. 
      * Step 1. Given the pid, determine which job this pid is a part of
@@ -254,6 +298,41 @@ handle_child_status(pid_t pid, int status)
      *         If a process was stopped, save the terminal state.
      */
 
+}
+
+/**
+ * Main's helper iterative function that iterates through all pipelines,
+ * their respective commands, and executes their commands. Adds each 
+ * pipeline to the job list, maintains records of which PIDs belong
+ * to which jobs via struct operations, and handles signaling via
+ * wait_for_job() and handle_child_status().
+*/
+void execute_command_line(struct ast_command_line* cline) {
+    // Iterates through the list of pipelines.
+    for (struct list_elem* pList = list_begin(&cline->pipes); pList != list_end(&cline->pipes); pList = list_next(pList)) { 
+        
+        // Adds a job for each pipeline.
+        struct ast_pipeline* pipe = list_entry(pList, struct ast_pipeline, elem);
+        struct job* job = add_job(pipe);
+
+        // Iterates through the list of commands within a pipeline.
+        for (struct list_elem* cList = list_begin(&pipe->commands); cList != list_end(&pipe->commands); cList = list_next(cList)) {
+
+            // Spawns a child process for each command within the pipeline.
+            struct ast_command* cmd = list_entry(cList, struct ast_command, elem);
+            posix_spawn_file_actions_t child_file_attr;
+            posix_spawnattr_t child_spawn_attr;
+            posix_spawnattr_init(&child_spawn_attr);
+            posix_spawn_file_actions_init(&child_file_attr);
+
+            // Obtains the pid of the spawned process and adds it to the pid list of the current job.
+            pid_t cpid;
+            posix_spawnp(&cpid, cmd->argv[0], &child_file_attr, &child_spawn_attr, &cmd->argv[1], environ);
+            add_pid_to_job(cpid, job);
+        }
+        // Waits for the current pipeline to finish. Calls handle_child_status().
+        wait_for_job(job);
+    }
 }
 
 int
@@ -305,40 +384,12 @@ main(int ac, char *av[])
         free (cmdline);
         if (cline == NULL)                  /* Error in command line */
             continue;
-        
-        // Iterates through the list of pipelines.
-        for (struct list_elem* pList = list_begin(&cline->pipes); pList != list_end(&cline->pipes); pList = list_next(pList)) { 
-            
-            // Adds a job for each pipeline.
-            struct ast_pipeline* pipe = list_entry(pList, struct ast_pipeline, elem);
-            struct job* job = add_job(pipe);
-
-            // Iterates through the list of commands within a pipeline.
-            for (struct list_elem* cList = list_begin(&pipe->commands); cList != list_end(&pipe->commands); cList = list_next(cList)) {
-
-                // Spawns a child process for each command within the pipeline.
-                struct ast_command* cmd = list_entry(cList, struct ast_command, elem);
-
-                posix_spawn_file_actions_t child_file_attr;
-                posix_spawnattr_t child_spawn_attr;
-
-                posix_spawnattr_init(&child_spawn_attr);
-                posix_spawn_file_actions_init(&child_file_attr);
-
-                pid_t cpid;
-                posix_spawnp(&cpid, cmd->argv[0], &child_file_attr, &child_spawn_attr, &cmd->argv[1], environ);
-            }
-
-            // Waits for the current pipeline to finish. Calls handle_child_status().
-            wait_for_job(job);
-        }
 
         if (list_empty(&cline->pipes)) {    /* User hit enter */
             ast_command_line_free(cline);
             continue;
         }
-        ast_command_line_print(cline);      /* Output a representation of
-                                               the entered command line */
+        execute_command_line(cline);
 
         /* Free the command line.
          * This will free the ast_pipeline objects still contained
