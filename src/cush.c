@@ -13,6 +13,7 @@
 #include <termios.h>
 #include <sys/wait.h>
 #include <assert.h>
+#include <spawn.h>
 
 /* Since the handed out code contains a number of unused functions. */
 #pragma GCC diagnostic ignored "-Wunused-function"
@@ -304,12 +305,32 @@ main(int ac, char *av[])
         free (cmdline);
         if (cline == NULL)                  /* Error in command line */
             continue;
+        
+        for (struct list_elem* pList = list_begin(&cline->pipes); pList != list_end(&cline->pipes); pList = list_next(pList)) { 
+            
+            struct ast_pipeline* pipe = list_entry(pList, struct ast_pipeline, elem);
+            struct job* job = add_job(pipe);
+            for (struct list_elem* cList = list_begin(&pipe->commands); cList != list_end(&pipe->commands); cList = list_next(cList)) {
+
+                struct ast_command* cmd = list_entry(cList, struct ast_command, elem);
+
+                posix_spawn_file_actions_t child_file_attr;
+                posix_spawnattr_t child_spawn_attr;
+
+                posix_spawnattr_init(&child_spawn_attr);
+                posix_spawn_file_actions_init(&child_file_attr);
+
+                pid_t cpid;
+                posix_spawnp(&cpid, cmd->argv[0], &child_file_attr, &child_spawn_attr, &cmd->argv[1], environ);
+            }
+            wait_for_job(job);
+
+        }
 
         if (list_empty(&cline->pipes)) {    /* User hit enter */
             ast_command_line_free(cline);
             continue;
         }
-
         ast_command_line_print(cline);      /* Output a representation of
                                                the entered command line */
 
