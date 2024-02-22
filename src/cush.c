@@ -55,6 +55,7 @@ enum job_status {
 
 struct job {
     struct list /*<pid_t>*/ pids;
+    pid_t pgid;
     struct list_elem elem;   /* Link element for jobs list. */
     struct ast_pipeline *pipe;  /* The pipeline of commands this job represents */
     int     jid;             /* Job id. */
@@ -96,6 +97,7 @@ static struct job *
 add_job(struct ast_pipeline *pipe)
 {
     struct job * job = malloc(sizeof *job);
+    job->pgid = 0;
     job->pipe = pipe;
     job->num_processes_alive = 0;
     list_init(&job->pids);
@@ -319,7 +321,8 @@ handle_child_status(pid_t pid, int status)
 void execute_command_line(struct ast_command_line* cline) {
     // Iterates through the list of pipelines.
     for (struct list_elem* pList = list_begin(&cline->pipes); pList != list_end(&cline->pipes); pList = list_next(pList)) { 
-        // Adds a job for each pipeline.
+        
+        // Blocks the child signal, then adds a job for each pipeline.
         signal_block(SIGCHLD);
         struct ast_pipeline* pipe = list_entry(pList, struct ast_pipeline, elem);
         struct job* job = add_job(pipe);
@@ -334,9 +337,21 @@ void execute_command_line(struct ast_command_line* cline) {
             posix_spawnattr_init(&child_spawn_attr);
             posix_spawn_file_actions_init(&child_file_attr);
 
-            // Obtains the pid of the spawned process and adds it to the pid list of the current job.
+            // Spawn the process as part of a process group. If the PGID of the job is 0, create a new group.
+            posix_spawnattr_setflags(&child_spawn_attr, POSIX_SPAWN_SETPGROUP);
+            posix_spawnattr_setpgroup(&child_spawn_attr, job->pgid);
+
+            printf("COMMAND: %s\n", cmd->argv[0]);
+            for (int i = 1; cmd->argv[i] != NULL; i++) {
+                printf("ARG: %s\n", cmd->argv[i]);
+            }
             pid_t cpid;
-            posix_spawnp(&cpid, cmd->argv[0], &child_file_attr, &child_spawn_attr, &cmd->argv[1], environ);
+            posix_spawnp(&cpid, cmd->argv[0], &child_file_attr, &child_spawn_attr, &cmd->argv[0], environ);
+
+            /* If this spawn created a new process group, store the PGID in the job's PGID field. */
+            if (job->pgid == 0) {
+                job->pgid = getpgid(cpid);
+            }
             add_pid_to_job(cpid, job);
         }
         // Waits for the current pipeline to finish. Calls handle_child_status().
