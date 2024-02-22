@@ -28,6 +28,7 @@
 static void handle_child_status(pid_t pid, int status);
 void execute_command_line(struct ast_command_line *);
 struct job *find_job_of_pid(pid_t pid);
+int call_builtin(char *cmd);
 
 static void
 usage(char *progname)
@@ -324,8 +325,17 @@ handle_child_status(pid_t pid, int status)
     {
         job->status = STOPPED;
         job->num_processes_alive--;
-        termstate_sample();
+
+        // Only sample the terminal if the process exited correctly
+        if (WEXITSTATUS(status) == 0)
+        {
+            termstate_sample();
+        }
         termstate_give_terminal_back_to_shell();
+    }
+    else if (WIFSIGNALED(status))
+    {
+        // TODO
     }
 
     /* To be implemented.
@@ -337,6 +347,57 @@ handle_child_status(pid_t pid, int status)
      *         num_processes_alive if appropriate.
      *         If a process was stopped, save the terminal state.
      */
+}
+
+/*
+ * Calls the builtin function specified by the cmd parameter. If the command matches a supported builtin,
+ * it calls the builtin function and returns 0 to indicate a successful builtin call. If the command
+ * does not match a supported builtin function, it returns 1 to indicate a non-matching command that needs
+ * to be spawned.
+ */
+int call_builtin(char *cmd)
+{
+    if (strcmp(cmd, "kill") == 0)
+    {
+        // TODO: call kill builtin function
+        printf("%s is a builtin function supported by cush.\n", cmd);
+        return 0;
+    }
+    else if (strcmp(cmd, "fg") == 0)
+    {
+        // TODO: call fg builtin function
+        printf("%s is a builtin function supported by cush.\n", cmd);
+        return 0;
+    }
+    else if (strcmp(cmd, "bg") == 0)
+    {
+        // TODO: call bg builtin function
+        printf("%s is a builtin function supported by cush.\n", cmd);
+        return 0;
+    }
+    else if (strcmp(cmd, "jobs") == 0)
+    {
+        // TODO: call jobs builtin function
+        printf("%s is a builtin function supported by cush.\n", cmd);
+        return 0;
+    }
+    else if (strcmp(cmd, "stop") == 0)
+    {
+        // TODO: call stop builtin function
+        printf("%s is a builtin function supported by cush.\n", cmd);
+        return 0;
+    }
+    else if (strcmp(cmd, "exit") == 0)
+    {
+        // TODO: call exit builtin function
+        printf("%s is a builtin function supported by cush.\n", cmd);
+        return 0;
+    }
+    else
+    {
+        // Indicates failure to call builtin
+        return 1;
+    }
 }
 
 /**
@@ -363,30 +424,38 @@ void execute_command_line(struct ast_command_line *cline)
 
             // Spawns a child process for each command within the pipeline.
             struct ast_command *cmd = list_entry(cList, struct ast_command, elem);
-            posix_spawn_file_actions_t child_file_attr;
-            posix_spawnattr_t child_spawn_attr;
-            posix_spawnattr_init(&child_spawn_attr);
-            posix_spawn_file_actions_init(&child_file_attr);
 
-            // Spawn the process as part of a process group. If the PGID of the job is 0, create a new group.
-            posix_spawnattr_setflags(&child_spawn_attr, POSIX_SPAWN_SETPGROUP);
-            posix_spawnattr_setpgroup(&child_spawn_attr, job->pgid);
-
-            // Spawn process.
-            pid_t cpid;
-            posix_spawnp(&cpid, cmd->argv[0], &child_file_attr, &child_spawn_attr, &cmd->argv[0], environ);
-
-            /* If this spawn created a new process group, store the PGID in the job's PGID field. */
-            if (job->pgid == 0)
+            // If the command does not match a supported builtin, follow process spawning procedures.
+            if (call_builtin(cmd->argv[0]) != 0)
             {
-                job->pgid = getpgid(cpid);
+                posix_spawn_file_actions_t child_file_attr;
+                posix_spawnattr_t child_spawn_attr;
+                posix_spawnattr_init(&child_spawn_attr);
+                posix_spawn_file_actions_init(&child_file_attr);
+
+                // Spawn the process as part of a process group. If the PGID of the job is 0, create a new group.
+                posix_spawnattr_setflags(&child_spawn_attr, POSIX_SPAWN_SETPGROUP);
+                posix_spawnattr_setpgroup(&child_spawn_attr, job->pgid);
+
+                /* Spawn process and add the process to the job PID list if the spawn is successful. Otherwise, output command not found error. */
+                pid_t cpid;
+                if (posix_spawnp(&cpid, cmd->argv[0], &child_file_attr, &child_spawn_attr, &cmd->argv[0], environ) == 0)
+                {
+                    /* If this spawn created a new process group, store the PGID in the job's PGID field. */
+                    if (job->pgid == 0)
+                    {
+                        job->pgid = getpgid(cpid);
+                    }
+                    printf("PID: %d\nPGID: %d\n", cpid, job->pgid);
+                    add_pid_to_job(cpid, job);
+                }
+                else
+                {
+                    fprintf(stderr, "-cush: %s: command not found\n", cmd->argv[0]);
+                }
             }
-            add_pid_to_job(cpid, job);
         }
-
-        // Waits for the current pipeline to finish. Calls handle_child_status().
         wait_for_job(job);
-
         signal_unblock(SIGCHLD);
     }
 }
