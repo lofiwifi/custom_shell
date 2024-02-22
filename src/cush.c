@@ -1,6 +1,8 @@
 /*
  * cush - the customizable shell.
  *
+ * Christopher Qiu and Ryan
+ *
  * Developed by Godmar Back for CS 3214 Summer 2020
  * Virginia Tech.  Augmented to use posix_spawn in Fall 2021.
  */
@@ -58,13 +60,13 @@ struct job
 {
     struct list /*<pid_t>*/ pids;
     pid_t pgid;
-    struct list_elem elem;   /* Link element for jobs list. */
-    struct ast_pipeline *pipe;  /* The pipeline of commands this job represents */
-    int     jid;             /* Job id. */
-    enum job_status status;  /* Job status. */ 
-    int  num_processes_alive;   /* The number of processes that we know to be alive */
-    struct termios saved_tty_state;  /* The state of the terminal when this job was 
-                                        stopped after having been in foreground */
+    struct list_elem elem;          /* Link element for jobs list. */
+    struct ast_pipeline *pipe;      /* The pipeline of commands this job represents */
+    int jid;                        /* Job id. */
+    enum job_status status;         /* Job status. */
+    int num_processes_alive;        /* The number of processes that we know to be alive */
+    struct termios saved_tty_state; /* The state of the terminal when this job was
+                                       stopped after having been in foreground */
 
     /* Add additional fields here if needed. */
 };
@@ -99,7 +101,7 @@ get_job_from_jid(int jid)
 static struct job *
 add_job(struct ast_pipeline *pipe)
 {
-    struct job * job = malloc(sizeof *job);
+    struct job *job = malloc(sizeof *job);
     job->pgid = 0;
     job->pipe = pipe;
     job->num_processes_alive = 0;
@@ -347,8 +349,9 @@ handle_child_status(pid_t pid, int status)
 void execute_command_line(struct ast_command_line *cline)
 {
     // Iterates through the list of pipelines.
-    for (struct list_elem* pList = list_begin(&cline->pipes); pList != list_end(&cline->pipes); pList = list_next(pList)) { 
-        
+    for (struct list_elem *pList = list_begin(&cline->pipes); pList != list_end(&cline->pipes); pList = list_next(pList))
+    {
+
         // Blocks the child signal, then adds a job for each pipeline.
         signal_block(SIGCHLD);
         struct ast_pipeline *pipe = list_entry(pList, struct ast_pipeline, elem);
@@ -374,7 +377,8 @@ void execute_command_line(struct ast_command_line *cline)
             posix_spawnp(&cpid, cmd->argv[0], &child_file_attr, &child_spawn_attr, &cmd->argv[0], environ);
 
             /* If this spawn created a new process group, store the PGID in the job's PGID field. */
-            if (job->pgid == 0) {
+            if (job->pgid == 0)
+            {
                 job->pgid = getpgid(cpid);
             }
             add_pid_to_job(cpid, job);
