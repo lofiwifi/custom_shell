@@ -323,7 +323,6 @@ handle_child_status(pid_t pid, int status)
 
     if (WIFEXITED(status))
     {
-        job->status = STOPPED;
         job->num_processes_alive--;
 
         // Only sample the terminal if the process exited correctly
@@ -332,6 +331,31 @@ handle_child_status(pid_t pid, int status)
             termstate_sample();
         }
         termstate_give_terminal_back_to_shell();
+    }
+    else if (WIFSTOPPED(status))
+    {
+        switch (WSTOPSIG(status))
+        {
+
+        /* If user stopped foreground process with Ctrl + Z */
+        case SIGTSTP:
+            job->status = STOPPED;
+            termstate_save(&job->saved_tty_state);
+            print_job(job);
+            termstate_give_terminal_back_to_shell();
+            break;
+
+        /* If user stopped background process with stop command */
+        case SIGSTOP:
+            job->status = STOPPED;
+            termstate_give_terminal_back_to_shell();
+            break;
+
+        /* If non-foreground process wants terminal access */
+        case (SIGTTOU || SIGTTIN):
+            job->status = FOREGROUND;
+            termstate_give_terminal_to(&job->saved_tty_state, job->pgid);
+        }
     }
     else if (WIFSIGNALED(status))
     {
@@ -393,11 +417,8 @@ int call_builtin(char *cmd)
         printf("%s is a builtin function supported by cush.\n", cmd);
         return 0;
     }
-    else
-    {
-        // Indicates failure to call builtin
-        return 1;
-    }
+
+    return 1;
 }
 
 /**
@@ -441,12 +462,16 @@ void execute_command_line(struct ast_command_line *cline)
                 pid_t cpid;
                 if (posix_spawnp(&cpid, cmd->argv[0], &child_file_attr, &child_spawn_attr, &cmd->argv[0], environ) == 0)
                 {
-                    /* If this spawn created a new process group, store the PGID in the job's PGID field. */
+                    /* If this spawn created a new process group, store the PGID in the job's PGID field.
+                       Give new foreground jobs terminal access. */
                     if (job->pgid == 0)
                     {
                         job->pgid = getpgid(cpid);
+                        if (!pipe->bg_job)
+                        {
+                            tcsetpgrp(termstate_get_tty_fd(), job->pgid);
+                        }
                     }
-                    printf("PID: %d\nPGID: %d\n", cpid, job->pgid);
                     add_pid_to_job(cpid, job);
                 }
                 else
@@ -455,6 +480,8 @@ void execute_command_line(struct ast_command_line *cline)
                 }
             }
         }
+
+        // After all processes have been spawned, wait for the job.
         wait_for_job(job);
         signal_unblock(SIGCHLD);
     }
