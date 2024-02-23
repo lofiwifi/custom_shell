@@ -31,13 +31,13 @@ struct job *find_job_of_pid(pid_t pid);
 static void delete_dead_jobs(void);
 
 // Built-in function prototypes
-int call_builtin(char **argv);
-void jobs_builtin(void);
-void exit_builtin(void);
-void stop_builtin(char* arg);
-void fg_builtin(char* arg);
-void bg_builtin(char* arg);
-void kill_builtin(char* arg);
+static int call_builtin(char **argv, struct job *job);
+static void jobs_builtin(void);
+static void exit_builtin(void);
+static void stop_builtin(int jid, struct job *job);
+static void fg_builtin(char *arg);
+static void bg_builtin(char *arg);
+static void kill_builtin(char *arg);
 
 static void
 usage(char *progname)
@@ -385,7 +385,8 @@ handle_child_status(pid_t pid, int status)
         case SIGTSTP:
             job->status = STOPPED;
             termstate_save(&job->saved_tty_state);
-            if (job->pgid == pid) {
+            if (job->pgid == pid)
+            {
                 print_job(job);
             }
             termstate_give_terminal_back_to_shell();
@@ -456,14 +457,24 @@ exit_builtin(void)
 }
 
 /* Stop built-in shell function. Stops the job specified by arg. */
-void stop_builtin(char* arg) {
-    killpg(get_job_from_jid(atoi(arg))->pgid, SIGSTOP);
+static void stop_builtin(int jid, struct job *job)
+{
+    struct job *to_stop = get_job_from_jid(jid);
+
+    if (jid2job[jid] == NULL || job->jid == jid)
+    {
+        printf("stop %d: No such job\n", jid);
+        return;
+    }
+
+    killpg(to_stop->pgid, SIGSTOP);
 }
 
-/* Foreground fg built-in shell function. Places the job of jid arg in 
+/* Foreground fg built-in shell function. Places the job of jid arg in
    the foreground. */
-void fg_builtin(char* arg) {
-    struct job* job = get_job_from_jid(atoi(arg));
+static void fg_builtin(char *arg)
+{
+    struct job *job = get_job_from_jid(atoi(arg));
     job->status = FOREGROUND;
 
     /* Output fg command line message. */
@@ -476,15 +487,17 @@ void fg_builtin(char* arg) {
 
 /* Background bg built-in shell function. Places the job of jid arg in
    the background and returns terminal control. */
-void bg_builtin(char* arg) {
-    struct job* job = get_job_from_jid(atoi(arg));
+static void bg_builtin(char *arg)
+{
+    struct job *job = get_job_from_jid(atoi(arg));
     job->status = BACKGROUND;
     printf("[%d] %d\n", job->jid, job->pgid);
     termstate_give_terminal_back_to_shell();
     killpg(job->pgid, SIGCONT);
 }
 
-void kill_builtin(char* arg) {
+static void kill_builtin(char *arg)
+{
     killpg(get_job_from_jid(atoi(arg))->pgid, SIGTERM);
 }
 
@@ -520,7 +533,7 @@ call_builtin(char **argv, struct job *job)
     }
     else if (strcmp(cmd, "stop") == 0)
     {
-        stop_builtin(argv[1]);
+        stop_builtin(job->jid, job);
         return 0;
     }
     else if (strcmp(cmd, "exit") == 0)
