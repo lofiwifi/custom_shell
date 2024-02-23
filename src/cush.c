@@ -172,10 +172,14 @@ struct job *find_job_of_pid(pid_t g_pid)
 static void
 delete_job(struct job *job)
 {
+    list_remove(&job->elem);
+
     // Frees internal job PID list.
-    for (struct list_elem *e = list_begin(&job->pids); e != list_end(&job->pids); e = list_next(e))
+    while(!list_empty(&job->pids))
     {
-        free(list_entry(e, struct pid, elem));
+        struct list_elem *e = list_pop_front(&job->pids);
+        struct pid *to_free = list_entry(e, struct pid, elem);
+        free(to_free);
     }
 
     int jid = job->jid;
@@ -307,6 +311,10 @@ wait_for_job(struct job *job)
         else
             utils_fatal_error("waitpid failed, see code for explanation");
     }
+
+    if(job->num_processes_alive <= 0){
+        delete_job(job);
+    }
 }
 
 static void
@@ -410,8 +418,9 @@ int call_builtin(char *cmd)
 void execute_command_line(struct ast_command_line *cline)
 {
     // Iterates through the list of pipelines.
-    for (struct list_elem *pList = list_begin(&cline->pipes); pList != list_end(&cline->pipes); pList = list_next(pList))
+    while (!list_empty(&cline->pipes))
     {
+        struct list_elem *pList = list_pop_front(&cline->pipes);
 
         // Blocks the child signal, then adds a job for each pipeline.
         signal_block(SIGCHLD);
@@ -527,7 +536,7 @@ int main(int ac, char *av[])
          * manage the lifetime of the associated ast_pipelines.
          * Otherwise, freeing here will cause use-after-free errors.
          */
-        ast_command_line_free(cline);
+        // ast_command_line_free(cline);
     }
     return 0;
 }
