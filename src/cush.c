@@ -31,10 +31,10 @@ struct job *find_job_of_pid(pid_t pid);
 void delete_dead_jobs(void);
 
 // Built-in function prototypes
-int call_builtin(char **argv);
+int call_builtin(char **argv, struct job *);
 void jobs_builtin(void);
 void exit_builtin(void);
-void stop_builtin(void);
+void stop_builtin(int, struct job *);
 
 static void
 usage(char *progname)
@@ -445,7 +445,19 @@ void exit_builtin(void)
     exit(0);
 }
 
-void stop_builtin() {}
+void stop_builtin(int jid, struct job *job)
+{
+
+    struct job *to_stop = get_job_from_jid(jid);
+
+    if (jid2job[jid] == NULL || job->jid == jid)
+    {
+        printf("stop %d: No such job\n", jid);
+        return;
+    }
+
+    killpg(to_stop->pgid, SIGSTOP);
+}
 
 /*
  * Calls the builtin function specified by the cmd parameter. If the command matches a supported builtin,
@@ -453,7 +465,7 @@ void stop_builtin() {}
  * does not match a supported builtin function, it returns 1 to indicate a non-matching command that needs
  * to be spawned.
  */
-int call_builtin(char **argv)
+int call_builtin(char **argv, struct job *job)
 {
     char *cmd = argv[0];
     if (strcmp(cmd, "kill") == 0)
@@ -480,8 +492,7 @@ int call_builtin(char **argv)
     }
     else if (strcmp(cmd, "stop") == 0)
     {
-        // TODO: call stop builtin function
-        printf("%s is a builtin function supported by cush.\n", cmd);
+        stop_builtin(atoi(argv[1]), job);
         return 0;
     }
     else if (strcmp(cmd, "exit") == 0)
@@ -518,7 +529,7 @@ void execute_command_line(struct ast_command_line *cline)
             struct ast_command *cmd = list_entry(cList, struct ast_command, elem);
 
             // If the command does not match a supported builtin, follow process spawning procedures.
-            if (call_builtin(cmd->argv) != 0)
+            if (call_builtin(cmd->argv, job) != 0)
             {
                 posix_spawn_file_actions_t child_file_attr;
                 posix_spawnattr_t child_spawn_attr;
