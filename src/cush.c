@@ -28,10 +28,13 @@
 static void handle_child_status(pid_t pid, int status);
 void execute_command_line(struct ast_command_line *);
 struct job *find_job_of_pid(pid_t pid);
+void delete_dead_jobs(void);
 
 // Built-in function prototypes
-int call_builtin(char *cmd);
+int call_builtin(char **argv);
 void jobs_builtin(void);
+void exit_builtin(void);
+void stop_builtin(void);
 
 static void
 usage(char *progname)
@@ -177,6 +180,10 @@ delete_job(struct job *job)
 {
     list_remove(&job->elem);
 
+    if (job->pipe->bg_job) {
+        printf("[%d]\tDone\n", job->jid);
+    }
+
     // Frees internal job PID list.
     while (!list_empty(&job->pids))
     {
@@ -191,6 +198,19 @@ delete_job(struct job *job)
     jid2job[jid] = NULL;
     ast_pipeline_free(job->pipe);
     free(job);
+}
+
+/* Deletes all jobs with no live processes remaining. Removes each dead
+   job from the job list. */
+void delete_dead_jobs(void) {
+    struct list_elem* e = list_begin(&job_list);
+    while (e != list_end(&job_list)) {
+        struct job* j = list_entry(e, struct job, elem);
+        if (j->num_processes_alive <= 0) {
+            delete_job(j);
+        }
+        e = list_next(e);
+    }
 }
 
 static const char *
@@ -314,11 +334,6 @@ wait_for_job(struct job *job)
         else
             utils_fatal_error("waitpid failed, see code for explanation");
     }
-
-    if (job->num_processes_alive <= 0)
-    {
-        delete_job(job);
-    }
 }
 
 static void
@@ -398,9 +413,25 @@ handle_child_status(pid_t pid, int status)
     }
 }
 
+/* Jobs built-in shell function. Outputs the current information about logged, live jobs to the current "standard" output. 
+   Deletes dead jobs as it iterates to prevent redundant, inaccurate information due to finished background processes. */
 void jobs_builtin(void) {
-
+    struct list_elem* e = list_begin(&job_list);
+    while (e != list_end(&job_list)) {
+        struct job* j = list_entry(e, struct job, elem);
+        if (j->pgid != 0) { // Does not print the "jobs" job
+            print_job(j);
+        }
+        e = list_next(e);
+    }
 }
+
+/* Exit built-in shell function. Exits cush and returns you to the bash shell.*/
+void exit_builtin(void) {
+    exit(0);
+}
+
+void stop_builtin() {}
 
 /*
  * Calls the builtin function specified by the cmd parameter. If the command matches a supported builtin,
@@ -408,12 +439,12 @@ void jobs_builtin(void) {
  * does not match a supported builtin function, it returns 1 to indicate a non-matching command that needs
  * to be spawned.
  */
-int call_builtin(char *cmd)
+int call_builtin(char **argv)
 {
+    char* cmd = argv[0];
     if (strcmp(cmd, "kill") == 0)
     {
         // TODO: call kill builtin function
-        printf("%s is a builtin function supported by cush.\n", cmd);
         return 0;
     }
     else if (strcmp(cmd, "fg") == 0)
@@ -430,8 +461,7 @@ int call_builtin(char *cmd)
     }
     else if (strcmp(cmd, "jobs") == 0)
     {
-        // TODO: call jobs builtin function
-        printf("%s is a builtin function supported by cush.\n", cmd);
+        jobs_builtin();
         return 0;
     }
     else if (strcmp(cmd, "stop") == 0)
@@ -442,11 +472,8 @@ int call_builtin(char *cmd)
     }
     else if (strcmp(cmd, "exit") == 0)
     {
-        // TODO: call exit builtin function
-        printf("%s is a builtin function supported by cush.\n", cmd);
-        return 0;
+        exit_builtin();
     }
-
     return 1;
 }
 
@@ -477,7 +504,7 @@ void execute_command_line(struct ast_command_line *cline)
             struct ast_command *cmd = list_entry(cList, struct ast_command, elem);
 
             // If the command does not match a supported builtin, follow process spawning procedures.
-            if (call_builtin(cmd->argv[0]) != 0)
+            if (call_builtin(cmd->argv) != 0)
             {
                 posix_spawn_file_actions_t child_file_attr;
                 posix_spawnattr_t child_spawn_attr;
@@ -490,15 +517,19 @@ void execute_command_line(struct ast_command_line *cline)
 
                 /* Spawn process and add the process to the job PID list if the spawn is successful. Otherwise, output command not found error. */
                 pid_t cpid;
+                extern char** environ;
                 if (posix_spawnp(&cpid, cmd->argv[0], &child_file_attr, &child_spawn_attr, &cmd->argv[0], environ) == 0)
                 {
                     /* If this spawn created a new process group, store the PGID in the job's PGID field.
-                       Give new foreground jobs terminal access. */
+                       Give new foreground jobs terminal access. Output job message if it's a background job. */
                     if (job->pgid == 0)
                     {
                         job->pgid = getpgid(cpid);
-                        if (!pipe->bg_job)
+                        if (pipe->bg_job)
                         {
+                            printf("[%d] %d\n", job->jid, job->pgid);
+                        }
+                        else {
                             tcsetpgrp(termstate_get_tty_fd(), job->pgid);
                         }
                     }
@@ -508,13 +539,17 @@ void execute_command_line(struct ast_command_line *cline)
                 {
                     fprintf(stderr, "cush: %s: command not found\n", cmd->argv[0]);
                 }
+
+                posix_spawnattr_destroy(&child_spawn_attr);
+                posix_spawn_file_actions_destroy(&child_file_attr);
             }
         }
 
-        // After all processes have been spawned, wait for the job.
+        // After all processes have been spawned, wait for the job if it is foreground.
         wait_for_job(job);
         signal_unblock(SIGCHLD);
     }
+    delete_dead_jobs();
 }
 
 int main(int ac, char *av[])
