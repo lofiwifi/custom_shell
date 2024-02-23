@@ -34,7 +34,10 @@ void delete_dead_jobs(void);
 int call_builtin(char **argv);
 void jobs_builtin(void);
 void exit_builtin(void);
-void stop_builtin(void);
+void stop_builtin(char* arg);
+void fg_builtin(char* arg);
+void bg_builtin(char* arg);
+void kill_builtin(char* arg);
 
 static void
 usage(char *progname)
@@ -379,7 +382,9 @@ handle_child_status(pid_t pid, int status)
         case SIGTSTP:
             job->status = STOPPED;
             termstate_save(&job->saved_tty_state);
-            print_job(job);
+            if (job->pgid == pid) {
+                print_job(job);
+            }
             termstate_give_terminal_back_to_shell();
             break;
 
@@ -445,7 +450,38 @@ void exit_builtin(void)
     exit(0);
 }
 
-void stop_builtin() {}
+/* Stop built-in shell function. Stops the job specified by arg. */
+void stop_builtin(char* arg) {
+    killpg(get_job_from_jid(atoi(arg))->pgid, SIGSTOP);
+}
+
+/* Foreground fg built-in shell function. Places the job of jid arg in 
+   the foreground. */
+void fg_builtin(char* arg) {
+    struct job* job = get_job_from_jid(atoi(arg));
+    job->status = FOREGROUND;
+
+    /* Output fg command line message. */
+    print_cmdline(job->pipe);
+    printf("\n");
+    termstate_give_terminal_to(&job->saved_tty_state, job->pgid);
+    killpg(job->pgid, SIGCONT);
+    wait_for_job(job);
+}
+
+/* Background bg built-in shell function. Places the job of jid arg in
+   the background and returns terminal control. */
+void bg_builtin(char* arg) {
+    struct job* job = get_job_from_jid(atoi(arg));
+    job->status = BACKGROUND;
+    printf("[%d] %d\n", job->jid, job->pgid);
+    termstate_give_terminal_back_to_shell();
+    killpg(job->pgid, SIGCONT);
+}
+
+void kill_builtin(char* arg) {
+    killpg(get_job_from_jid(atoi(arg))->pgid, SIGTERM);
+}
 
 /*
  * Calls the builtin function specified by the cmd parameter. If the command matches a supported builtin,
@@ -458,19 +494,17 @@ int call_builtin(char **argv)
     char *cmd = argv[0];
     if (strcmp(cmd, "kill") == 0)
     {
-        // TODO: call kill builtin function
+        kill_builtin(argv[1]);
         return 0;
     }
     else if (strcmp(cmd, "fg") == 0)
     {
-        // TODO: call fg builtin function
-        printf("%s is a builtin function supported by cush.\n", cmd);
+        fg_builtin(argv[1]);
         return 0;
     }
     else if (strcmp(cmd, "bg") == 0)
     {
-        // TODO: call bg builtin function
-        printf("%s is a builtin function supported by cush.\n", cmd);
+        bg_builtin(argv[1]);
         return 0;
     }
     else if (strcmp(cmd, "jobs") == 0)
@@ -480,8 +514,7 @@ int call_builtin(char **argv)
     }
     else if (strcmp(cmd, "stop") == 0)
     {
-        // TODO: call stop builtin function
-        printf("%s is a builtin function supported by cush.\n", cmd);
+        stop_builtin(argv[1]);
         return 0;
     }
     else if (strcmp(cmd, "exit") == 0)
