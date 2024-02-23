@@ -26,15 +26,15 @@
 #include "utils.h"
 
 static void handle_child_status(pid_t pid, int status);
-void execute_command_line(struct ast_command_line *);
+static void execute_command_line(struct ast_command_line *);
 struct job *find_job_of_pid(pid_t pid);
-void delete_dead_jobs(void);
+static void delete_dead_jobs(void);
 
 // Built-in function prototypes
-int call_builtin(char **argv, struct job *);
-void jobs_builtin(void);
-void exit_builtin(void);
-void stop_builtin(int, struct job *);
+static int call_builtin(char **argv, struct job *);
+static void jobs_builtin(void);
+static void exit_builtin(void);
+static void stop_builtin(int, struct job *);
 
 static void
 usage(char *progname)
@@ -140,7 +140,8 @@ add_job(struct ast_pipeline *pipe)
 
 /* Adds a pid to the end of the pid list of the given job. Initializes this list if necessary.
    Assumes that the given PID is active, so it increases the num_processes_alive field. */
-static void add_pid_to_job(pid_t pid, struct job *job)
+static void
+add_pid_to_job(pid_t pid, struct job *job)
 {
     struct pid *pid_str = malloc(sizeof(struct pid));
     pid_str->pid = pid;
@@ -150,7 +151,8 @@ static void add_pid_to_job(pid_t pid, struct job *job)
 
 /* Iterates through the current job list and each job list's pid list to find the job
    belonging to the given pid. */
-struct job *find_job_of_pid(pid_t g_pid)
+struct job *
+find_job_of_pid(pid_t g_pid)
 {
 
     // Iterates through every job in the list
@@ -203,7 +205,8 @@ delete_job(struct job *job)
 
 /* Deletes all jobs with no live processes remaining. Removes each dead
    job from the job list. */
-void delete_dead_jobs(void)
+static void
+delete_dead_jobs(void)
 {
     for (int i = list_size(&job_list); i > 0; i--)
     {
@@ -425,7 +428,8 @@ handle_child_status(pid_t pid, int status)
 
 /* Jobs built-in shell function. Outputs the current information about logged, live jobs to the current "standard" output.
    Deletes dead jobs as it iterates to prevent redundant, inaccurate information due to finished background processes. */
-void jobs_builtin(void)
+static void
+jobs_builtin(void)
 {
     struct list_elem *e = list_begin(&job_list);
     while (e != list_end(&job_list))
@@ -440,12 +444,14 @@ void jobs_builtin(void)
 }
 
 /* Exit built-in shell function. Exits cush and returns you to the bash shell.*/
-void exit_builtin(void)
+static void
+exit_builtin(void)
 {
     exit(0);
 }
 
-void stop_builtin(int jid, struct job *job)
+static void
+stop_builtin(int jid, struct job *job)
 {
 
     struct job *to_stop = get_job_from_jid(jid);
@@ -465,7 +471,8 @@ void stop_builtin(int jid, struct job *job)
  * does not match a supported builtin function, it returns 1 to indicate a non-matching command that needs
  * to be spawned.
  */
-int call_builtin(char **argv, struct job *job)
+static int
+call_builtin(char **argv, struct job *job)
 {
     char *cmd = argv[0];
     if (strcmp(cmd, "kill") == 0)
@@ -509,7 +516,8 @@ int call_builtin(char **argv, struct job *job)
  * to which jobs via struct operations, and handles signaling via
  * wait_for_job() and handle_child_status().
  */
-void execute_command_line(struct ast_command_line *cline)
+static void
+execute_command_line(struct ast_command_line *cline)
 {
     // Iterates through the list of pipelines.
     while (!list_empty(&cline->pipes))
