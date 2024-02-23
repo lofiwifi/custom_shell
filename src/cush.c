@@ -28,7 +28,10 @@
 static void handle_child_status(pid_t pid, int status);
 void execute_command_line(struct ast_command_line *);
 struct job *find_job_of_pid(pid_t pid);
+
+// Built-in function prototypes
 int call_builtin(char *cmd);
+void jobs_builtin(void);
 
 static void
 usage(char *progname)
@@ -175,7 +178,7 @@ delete_job(struct job *job)
     list_remove(&job->elem);
 
     // Frees internal job PID list.
-    while(!list_empty(&job->pids))
+    while (!list_empty(&job->pids))
     {
         struct list_elem *e = list_pop_front(&job->pids);
         struct pid *to_free = list_entry(e, struct pid, elem);
@@ -312,7 +315,8 @@ wait_for_job(struct job *job)
             utils_fatal_error("waitpid failed, see code for explanation");
     }
 
-    if(job->num_processes_alive <= 0){
+    if (job->num_processes_alive <= 0)
+    {
         delete_job(job);
     }
 }
@@ -325,7 +329,8 @@ handle_child_status(pid_t pid, int status)
     struct job *job = find_job_of_pid(pid);
     if (job == NULL)
     {
-        printf("ERROR: given PID is not associated with a job.\n");
+        char *out = "ERROR: given PID is not associated with a job.\n";
+        write(1, out, strlen(out));
         return;
     }
 
@@ -367,18 +372,34 @@ handle_child_status(pid_t pid, int status)
     }
     else if (WIFSIGNALED(status))
     {
-        // TODO
-    }
+        /* If the process was killed at all, decrement live processes and return terminal control to shell. */
+        job->num_processes_alive--;
+        termstate_give_terminal_back_to_shell();
+        char *buf;
+        switch (WTERMSIG(status))
+        {
 
-    /* To be implemented.
-     * Step 1. Given the pid, determine which job this pid is a part of
-     *         (how to do this is not part of the provided code.)
-     * Step 2. Determine what status change occurred using the
-     *         WIF*() macros.
-     * Step 3. Update the job status accordingly, and adjust
-     *         num_processes_alive if appropriate.
-     *         If a process was stopped, save the terminal state.
-     */
+        /* User terminates process with CTRL+C */
+        case SIGINT:
+            printf("\n");
+            break;
+
+        /* User terminates process with kill command OR user terminates process with kill -9 */
+        case SIGTERM || SIGKILL:
+            buf = strsignal(WTERMSIG(status));
+            write(1, buf, strlen(buf));
+            break;
+
+        /* General case, process has been terminated */
+        default:
+            buf = strsignal(WTERMSIG(status));
+            write(1, buf, strlen(buf));
+        }
+    }
+}
+
+void jobs_builtin(void) {
+
 }
 
 /*
@@ -485,7 +506,7 @@ void execute_command_line(struct ast_command_line *cline)
                 }
                 else
                 {
-                    fprintf(stderr, "-cush: %s: command not found\n", cmd->argv[0]);
+                    fprintf(stderr, "cush: %s: command not found\n", cmd->argv[0]);
                 }
             }
         }
