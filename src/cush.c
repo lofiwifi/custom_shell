@@ -180,7 +180,8 @@ delete_job(struct job *job)
 {
     list_remove(&job->elem);
 
-    if (job->pipe->bg_job) {
+    if (job->pipe->bg_job)
+    {
         printf("[%d]\tDone\n", job->jid);
     }
 
@@ -202,14 +203,21 @@ delete_job(struct job *job)
 
 /* Deletes all jobs with no live processes remaining. Removes each dead
    job from the job list. */
-void delete_dead_jobs(void) {
-    struct list_elem* e = list_begin(&job_list);
-    while (e != list_end(&job_list)) {
-        struct job* j = list_entry(e, struct job, elem);
-        if (j->num_processes_alive <= 0) {
-            delete_job(j);
+void delete_dead_jobs(void)
+{
+    for (int i = list_size(&job_list); i > 0; i--)
+    {
+        struct list_elem *e = list_pop_front(&job_list);
+        struct job *curr_job = list_entry(e, struct job, elem);
+
+        if (curr_job->num_processes_alive <= 0)
+        {
+            delete_job(curr_job);
         }
-        e = list_next(e);
+        else
+        {
+            list_push_back(&job_list, e);
+        }
     }
 }
 
@@ -334,6 +342,8 @@ wait_for_job(struct job *job)
         else
             utils_fatal_error("waitpid failed, see code for explanation");
     }
+
+    delete_dead_jobs();
 }
 
 static void
@@ -413,13 +423,16 @@ handle_child_status(pid_t pid, int status)
     }
 }
 
-/* Jobs built-in shell function. Outputs the current information about logged, live jobs to the current "standard" output. 
+/* Jobs built-in shell function. Outputs the current information about logged, live jobs to the current "standard" output.
    Deletes dead jobs as it iterates to prevent redundant, inaccurate information due to finished background processes. */
-void jobs_builtin(void) {
-    struct list_elem* e = list_begin(&job_list);
-    while (e != list_end(&job_list)) {
-        struct job* j = list_entry(e, struct job, elem);
-        if (j->pgid != 0) { // Does not print the "jobs" job
+void jobs_builtin(void)
+{
+    struct list_elem *e = list_begin(&job_list);
+    while (e != list_end(&job_list))
+    {
+        struct job *j = list_entry(e, struct job, elem);
+        if (j->pgid != 0)
+        { // Does not print the "jobs" job
             print_job(j);
         }
         e = list_next(e);
@@ -427,7 +440,8 @@ void jobs_builtin(void) {
 }
 
 /* Exit built-in shell function. Exits cush and returns you to the bash shell.*/
-void exit_builtin(void) {
+void exit_builtin(void)
+{
     exit(0);
 }
 
@@ -441,7 +455,7 @@ void stop_builtin() {}
  */
 int call_builtin(char **argv)
 {
-    char* cmd = argv[0];
+    char *cmd = argv[0];
     if (strcmp(cmd, "kill") == 0)
     {
         // TODO: call kill builtin function
@@ -517,7 +531,7 @@ void execute_command_line(struct ast_command_line *cline)
 
                 /* Spawn process and add the process to the job PID list if the spawn is successful. Otherwise, output command not found error. */
                 pid_t cpid;
-                extern char** environ;
+                extern char **environ;
                 if (posix_spawnp(&cpid, cmd->argv[0], &child_file_attr, &child_spawn_attr, &cmd->argv[0], environ) == 0)
                 {
                     /* If this spawn created a new process group, store the PGID in the job's PGID field.
@@ -529,7 +543,8 @@ void execute_command_line(struct ast_command_line *cline)
                         {
                             printf("[%d] %d\n", job->jid, job->pgid);
                         }
-                        else {
+                        else
+                        {
                             tcsetpgrp(termstate_get_tty_fd(), job->pgid);
                         }
                     }
@@ -549,7 +564,6 @@ void execute_command_line(struct ast_command_line *cline)
         wait_for_job(job);
         signal_unblock(SIGCHLD);
     }
-    delete_dead_jobs();
 }
 
 int main(int ac, char *av[])
