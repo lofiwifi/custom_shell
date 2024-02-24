@@ -37,7 +37,7 @@ static void exit_builtin(void);
 static void stop_builtin(int jid, struct job *job);
 static void fg_builtin(char *arg);
 static void bg_builtin(char *arg);
-static void kill_builtin(char *arg);
+static void kill_builtin(int jid, struct job *job);
 
 static void
 usage(char *progname)
@@ -496,9 +496,17 @@ static void bg_builtin(char *arg)
     killpg(job->pgid, SIGCONT);
 }
 
-static void kill_builtin(char *arg)
+static void kill_builtin(int jid, struct job *job)
 {
-    killpg(get_job_from_jid(atoi(arg))->pgid, SIGTERM);
+    struct job *to_kill = get_job_from_jid(jid);
+
+    if (jid2job[jid] == NULL || job->jid == jid)
+    {
+        printf("kill %d: No such job\n", jid);
+        return;
+    }
+
+    killpg(to_kill->pgid, SIGTERM);
 }
 
 /*
@@ -513,7 +521,7 @@ call_builtin(char **argv, struct job *job)
     char *cmd = argv[0];
     if (strcmp(cmd, "kill") == 0)
     {
-        kill_builtin(argv[1]);
+        kill_builtin(atoi(argv[1]), job);
         return 0;
     }
     else if (strcmp(cmd, "fg") == 0)
@@ -533,7 +541,7 @@ call_builtin(char **argv, struct job *job)
     }
     else if (strcmp(cmd, "stop") == 0)
     {
-        stop_builtin(job->jid, job);
+        stop_builtin(atoi(argv[1]), job);
         return 0;
     }
     else if (strcmp(cmd, "exit") == 0)
