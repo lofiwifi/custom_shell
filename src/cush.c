@@ -27,7 +27,7 @@
 
 static void handle_child_status(pid_t pid, int status);
 static void execute_command_line(struct ast_command_line *);
-struct job *find_job_of_pid(pid_t pid);
+static struct job *find_job_of_pid(pid_t pid);
 static void delete_dead_jobs(void);
 
 // Built-in function prototypes
@@ -154,7 +154,7 @@ add_pid_to_job(pid_t pid, struct job *job)
 
 /* Iterates through the current job list and each job list's pid list to find the job
    belonging to the given pid. */
-struct job *
+static struct job *
 find_job_of_pid(pid_t g_pid)
 {
 
@@ -457,7 +457,8 @@ exit_builtin(void)
 }
 
 /* Stop built-in shell function. Stops the job specified by arg. */
-static void stop_builtin(int jid, struct job *job)
+static void
+stop_builtin(int jid, struct job *job)
 {
     struct job *to_stop = get_job_from_jid(jid);
 
@@ -472,7 +473,8 @@ static void stop_builtin(int jid, struct job *job)
 
 /* Foreground fg built-in shell function. Places the job of jid arg in
    the foreground. */
-static void fg_builtin(char *arg)
+static void
+fg_builtin(char *arg)
 {
     struct job *job = get_job_from_jid(atoi(arg));
     job->status = FOREGROUND;
@@ -487,7 +489,8 @@ static void fg_builtin(char *arg)
 
 /* Background bg built-in shell function. Places the job of jid arg in
    the background and returns terminal control. */
-static void bg_builtin(char *arg)
+static void
+bg_builtin(char *arg)
 {
     struct job *job = get_job_from_jid(atoi(arg));
     job->status = BACKGROUND;
@@ -496,7 +499,8 @@ static void bg_builtin(char *arg)
     killpg(job->pgid, SIGCONT);
 }
 
-static void kill_builtin(int jid, struct job *job)
+static void
+kill_builtin(int jid, struct job *job)
 {
     struct job *to_kill = get_job_from_jid(jid);
 
