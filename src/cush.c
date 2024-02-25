@@ -77,6 +77,7 @@ struct job
     int num_processes_alive;        /* The number of processes that we know to be alive */
     struct termios saved_tty_state; /* The state of the terminal when this job was
                                        stopped after having been in foreground */
+    bool termstate_saved;           /* Tracks whether or not the terminal state has been saved before. */
 
     /* Add additional fields here if needed. */
 };
@@ -115,6 +116,7 @@ add_job(struct ast_pipeline *pipe)
     job->pgid = 0;
     job->pipe = pipe;
     job->num_processes_alive = 0;
+    job->termstate_saved = false;
     list_init(&job->pids);
     list_push_back(&job_list, &job->elem);
 
@@ -348,7 +350,6 @@ wait_for_job(struct job *job)
         else
             utils_fatal_error("waitpid failed, see code for explanation");
     }
-
     delete_dead_jobs();
 }
 
@@ -385,6 +386,7 @@ handle_child_status(pid_t pid, int status)
         case SIGTSTP:
             job->status = STOPPED;
             termstate_save(&job->saved_tty_state);
+            job->termstate_saved = true;
             if (job->pgid == pid)
             {
                 print_job(job);
@@ -482,7 +484,15 @@ fg_builtin(char *arg)
     /* Output fg command line message. */
     print_cmdline(job->pipe);
     printf("\n");
-    termstate_give_terminal_to(&job->saved_tty_state, job->pgid);
+
+    if (job->termstate_saved == false)
+    { // Ensures it calls NULL for unsaved termstates
+        termstate_give_terminal_to(NULL, job->pgid);
+    }
+    else
+    {
+        termstate_give_terminal_to(&job->saved_tty_state, job->pgid);
+    }
     killpg(job->pgid, SIGCONT);
     wait_for_job(job);
 }
