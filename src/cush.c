@@ -16,6 +16,8 @@
 #include <sys/wait.h>
 #include <assert.h>
 #include <spawn.h>
+#include <stdio.h>
+#include <fcntl.h>
 
 /* Since the handed out code contains a number of unused functions. */
 #pragma GCC diagnostic ignored "-Wunused-function"
@@ -605,11 +607,26 @@ execute_command_line(struct ast_command_line *cline)
                 posix_spawnattr_setflags(&child_spawn_attr, POSIX_SPAWN_SETPGROUP);
                 posix_spawnattr_setpgroup(&child_spawn_attr, job->pgid);
 
+                int fd = 0;
+
+                // Redirect input
+                if (pipe->iored_input != NULL && cList == list_begin(&pipe->commands))
+                {
+                    fd = open(pipe->iored_input, O_RDONLY);
+
+                    posix_spawn_file_actions_addopen(&child_file_attr, 0, pipe->iored_input, O_RDONLY, 0444);
+                }
+
                 /* Spawn process and add the process to the job PID list if the spawn is successful. Otherwise, output command not found error. */
                 pid_t cpid;
                 extern char **environ;
                 if (posix_spawnp(&cpid, cmd->argv[0], &child_file_attr, &child_spawn_attr, &cmd->argv[0], environ) == 0)
                 {
+                    if (fd)
+                    {
+                        close(fd);
+                    }
+
                     /* If this spawn created a new process group, store the PGID in the job's PGID field.
                        Give new foreground jobs terminal access. Output job message if it's a background job. */
                     if (job->pgid == 0)
