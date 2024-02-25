@@ -1,7 +1,7 @@
 /*
  * cush - the customizable shell.
  *
- * Christopher Qiu and Ryan
+ * Christopher Qiu and Ryan Erickson
  *
  * Developed by Godmar Back for CS 3214 Summer 2020
  * Virginia Tech.  Augmented to use posix_spawn in Fall 2021.
@@ -68,8 +68,8 @@ enum job_status
 
 struct job
 {
-    struct list /*<pid_t>*/ pids;
-    pid_t pgid;
+    struct list pids;               /* List of pids for job. */
+    pid_t pgid;                     /* gpid for job. */
     struct list_elem elem;          /* Link element for jobs list. */
     struct ast_pipeline *pipe;      /* The pipeline of commands this job represents */
     int jid;                        /* Job id. */
@@ -509,6 +509,7 @@ bg_builtin(char *arg)
     killpg(job->pgid, SIGCONT);
 }
 
+/* Kill built-in shell function. Kills the job specified by jid. */
 static void
 kill_builtin(int jid, struct job *job)
 {
@@ -698,6 +699,7 @@ int main(int ac, char *av[])
             ast_command_line_free(cline);
             continue;
         }
+
         execute_command_line(cline);
 
         /* Free the command line.
