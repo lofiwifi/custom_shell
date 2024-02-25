@@ -607,14 +607,32 @@ execute_command_line(struct ast_command_line *cline)
                 posix_spawnattr_setflags(&child_spawn_attr, POSIX_SPAWN_SETPGROUP);
                 posix_spawnattr_setpgroup(&child_spawn_attr, job->pgid);
 
-                int fd = 0;
+                int fd_in = 0;
+                int fd_out = 0;
 
                 // Redirect input
                 if (pipe->iored_input != NULL && cList == list_begin(&pipe->commands))
                 {
-                    fd = open(pipe->iored_input, O_RDONLY);
+                    fd_in = open(pipe->iored_input, O_RDONLY);
 
-                    posix_spawn_file_actions_addopen(&child_file_attr, 0, pipe->iored_input, O_RDONLY, 0444);
+                    posix_spawn_file_actions_addopen(&child_file_attr, 0, pipe->iored_input, O_RDONLY, 0666);
+                }
+
+                // Redirect output
+                if (pipe->iored_output != NULL && cList == list_end(&pipe->commands)->prev)
+                {
+                    if (pipe->append_to_output)
+                    {
+                        fd_out = open(pipe->iored_output, O_WRONLY | O_CREAT | O_APPEND);
+
+                        posix_spawn_file_actions_addopen(&child_file_attr, 1, pipe->iored_output, O_WRONLY | O_CREAT | O_APPEND, 0666);
+                    }
+                    else
+                    {
+                        fd_out = open(pipe->iored_output, O_WRONLY | O_CREAT | O_TRUNC);
+
+                        posix_spawn_file_actions_addopen(&child_file_attr, 1, pipe->iored_output, O_WRONLY | O_CREAT | O_TRUNC, 0666);
+                    }
                 }
 
                 /* Spawn process and add the process to the job PID list if the spawn is successful. Otherwise, output command not found error. */
@@ -622,9 +640,14 @@ execute_command_line(struct ast_command_line *cline)
                 extern char **environ;
                 if (posix_spawnp(&cpid, cmd->argv[0], &child_file_attr, &child_spawn_attr, &cmd->argv[0], environ) == 0)
                 {
-                    if (fd)
+                    if (fd_in)
                     {
-                        close(fd);
+                        close(fd_in);
+                    }
+
+                    if (fd_out)
+                    {
+                        close(fd_out);
                     }
 
                     /* If this spawn created a new process group, store the PGID in the job's PGID field.
