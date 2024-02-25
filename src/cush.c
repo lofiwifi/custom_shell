@@ -373,7 +373,7 @@ handle_child_status(pid_t pid, int status)
         job->num_processes_alive--;
 
         // Only sample the terminal if the process exited correctly
-        if (WEXITSTATUS(status) == 0)
+        if (WEXITSTATUS(status) == 0 && job->status == FOREGROUND)
         {
             termstate_sample();
         }
@@ -638,7 +638,8 @@ execute_command_line(struct ast_command_line *cline)
                 /* Spawn process and add the process to the job PID list if the spawn is successful. Otherwise, output command not found error. */
                 pid_t cpid;
                 extern char **environ;
-                if (posix_spawnp(&cpid, cmd->argv[0], &child_file_attr, &child_spawn_attr, &cmd->argv[0], environ) == 0)
+                int return_value;
+                if ((return_value = posix_spawnp(&cpid, cmd->argv[0], &child_file_attr, &child_spawn_attr, &cmd->argv[0], environ)) == 0)
                 {
                     if (fd_in)
                     {
@@ -665,6 +666,10 @@ execute_command_line(struct ast_command_line *cline)
                         }
                     }
                     add_pid_to_job(cpid, job);
+                }
+                else if (return_value == 2)
+                {
+                    fprintf(stderr, "cush: %s: No such file or directory\n", cmd->argv[0]);
                 }
                 else
                 {
