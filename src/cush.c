@@ -588,6 +588,22 @@ execute_command_line(struct ast_command_line *cline)
         struct ast_pipeline *pipe = list_entry(pList, struct ast_pipeline, elem);
         struct job *job = add_job(pipe);
 
+        // Create matrix of 2*(n-1) pipe fds.
+        // Matrix is of size 2*n to make logic simpler.
+        int num_pipes = list_size(&pipe->commands) - 1;
+        int pipefds[num_pipes + 1][2];
+
+        for (int i = 0; i < num_pipes; i++)
+        {
+            int currfds[2];
+            pipe2(currfds, O_CLOEXEC);
+
+            pipefds[i][0] = currfds[0];
+            pipefds[i][1] = currfds[1];
+        }
+
+        int cmd_index = 0;
+
         // Iterates through the list of commands within a pipeline.
         for (struct list_elem *cList = list_begin(&pipe->commands); cList != list_end(&pipe->commands); cList = list_next(cList))
         {
@@ -610,7 +626,7 @@ execute_command_line(struct ast_command_line *cline)
                 int fd_in = 0;
                 int fd_out = 0;
 
-                // Redirect input
+                // Redirect input.
                 if (pipe->iored_input != NULL && cList == list_begin(&pipe->commands))
                 {
                     fd_in = open(pipe->iored_input, O_RDONLY);
@@ -618,7 +634,7 @@ execute_command_line(struct ast_command_line *cline)
                     posix_spawn_file_actions_addopen(&child_file_attr, 0, pipe->iored_input, O_RDONLY, 0666);
                 }
 
-                // Redirect output
+                // Redirect output.
                 if (pipe->iored_output != NULL && cList == list_end(&pipe->commands)->prev)
                 {
                     if (pipe->append_to_output)
@@ -633,6 +649,23 @@ execute_command_line(struct ast_command_line *cline)
 
                         posix_spawn_file_actions_addopen(&child_file_attr, 1, pipe->iored_output, O_WRONLY | O_CREAT | O_TRUNC, 0666);
                     }
+                }
+
+                // Linking pipe output.
+                if (num_pipes > 0 && cList != list_end(&pipe->commands)->prev)
+                {
+                    posix_spawn_file_actions_adddup2(&child_file_attr, pipefds[cmd_index][1], 1);
+
+                    if (cmd->dup_stderr_to_stdout)
+                    {
+                        posix_spawn_file_actions_adddup2(&child_file_attr, pipefds[cmd_index][1], 2);
+                    }
+                }
+
+                // Linking pipe input.
+                if (num_pipes > 0 && cList != list_begin(&pipe->commands))
+                {
+                    posix_spawn_file_actions_adddup2(&child_file_attr, pipefds[cmd_index-1][0], 0);
                 }
 
                 /* Spawn process and add the process to the job PID list if the spawn is successful. Otherwise, output command not found error. */
@@ -674,6 +707,15 @@ execute_command_line(struct ast_command_line *cline)
                 posix_spawnattr_destroy(&child_spawn_attr);
                 posix_spawn_file_actions_destroy(&child_file_attr);
             }
+
+            cmd_index++;
+        }
+
+        // Close pipes.
+        for (int i = 0; i < num_pipes; i++)
+        {
+            close(pipefds[i][0]);
+            close(pipefds[i][1]);
         }
 
         // After all processes have been spawned, wait for the job if it is foreground.
