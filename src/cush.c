@@ -632,6 +632,8 @@ execute_command_line(struct ast_command_line *cline)
                     fd_in = open(pipe->iored_input, O_RDONLY);
 
                     posix_spawn_file_actions_addopen(&child_file_attr, 0, pipe->iored_input, O_RDONLY, 0666);
+
+                    close(fd_in);
                 }
 
                 // Redirect output.
@@ -649,6 +651,8 @@ execute_command_line(struct ast_command_line *cline)
 
                         posix_spawn_file_actions_addopen(&child_file_attr, 1, pipe->iored_output, O_WRONLY | O_CREAT | O_TRUNC, 0666);
                     }
+
+                    close(fd_out);
                 }
 
                 // Linking pipe output.
