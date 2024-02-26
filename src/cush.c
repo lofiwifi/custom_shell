@@ -18,6 +18,7 @@
 #include <spawn.h>
 #include <stdio.h>
 #include <fcntl.h>
+#include <readline/history.h>
 
 /* Since the handed out code contains a number of unused functions. */
 #pragma GCC diagnostic ignored "-Wunused-function"
@@ -40,6 +41,8 @@ static void stop_builtin(int jid, struct job *job);
 static void fg_builtin(char *arg);
 static void bg_builtin(char *arg);
 static void kill_builtin(int jid, struct job *job);
+static void history_builtin(char *arg);
+static int check_expansion(char **argv);
 
 static void
 usage(char *progname)
@@ -526,6 +529,36 @@ kill_builtin(int jid, struct job *job)
     killpg(to_kill->pgid, SIGTERM);
 }
 
+/* History built-in shell function. Displays past command history and allows
+   for querying of commands. */
+static void history_builtin(char *arg)
+{
+    HIST_ENTRY **list = history_list();
+    for (int i = (history_base - 1); i < (history_base + history_length - 1); i++)
+    {
+        printf("%5d  %s\n", (i + 1), list[i]->line);
+    }
+}
+
+/* Checks for a command-line history expansion. If an expansion is successful, the command
+   given in argv is replaced with the expansion. Returns 0 if the expansion was successful
+   and the command can be executed. Returns 1 if there was an issue with expansion or
+   the command does not need to be executed. Handles output of the expansion function. */
+static int check_expansion(char **cmd)
+{
+    switch (history_expand(*cmd, cmd))
+    {
+    case -1:
+        fprintf(stderr, "%s\n", *cmd);
+        return 1;
+    case 2:
+        printf("%s\n", *cmd);
+        return 1;
+    default:
+        return 0;
+    }
+}
+
 /*
  * Calls the builtin function specified by the cmd parameter. If the command matches a supported builtin,
  * it calls the builtin function and returns 0 to indicate a successful builtin call. If the command
@@ -564,6 +597,11 @@ call_builtin(char **argv, struct job *job)
     else if (strcmp(cmd, "exit") == 0)
     {
         exit_builtin();
+    }
+    else if (strcmp(cmd, "history") == 0)
+    {
+        history_builtin(argv[1]);
+        return 0;
     }
     return 1;
 }
@@ -669,14 +707,13 @@ execute_command_line(struct ast_command_line *cline)
                 // Linking pipe input.
                 if (num_pipes > 0 && cList != list_begin(&pipe->commands))
                 {
-                    posix_spawn_file_actions_adddup2(&child_file_attr, pipefds[cmd_index-1][0], 0);
+                    posix_spawn_file_actions_adddup2(&child_file_attr, pipefds[cmd_index - 1][0], 0);
                 }
 
                 /* Spawn process and add the process to the job PID list if the spawn is successful. Otherwise, output command not found error. */
                 pid_t cpid;
                 extern char **environ;
-                int return_value;
-                if ((return_value = posix_spawnp(&cpid, cmd->argv[0], &child_file_attr, &child_spawn_attr, &cmd->argv[0], environ)) == 0)
+                if (posix_spawnp(&cpid, cmd->argv[0], &child_file_attr, &child_spawn_attr, &cmd->argv[0], environ) == 0)
                 {
                     if (fd_in)
                     {
@@ -704,13 +741,9 @@ execute_command_line(struct ast_command_line *cline)
                     }
                     add_pid_to_job(cpid, job);
                 }
-                else if (return_value == 2)
-                {
-                    fprintf(stderr, "cush: %s: No such file or directory\n", cmd->argv[0]);
-                }
                 else
                 {
-                    fprintf(stderr, "cush: %s: command not found\n", cmd->argv[0]);
+                    utils_error("%s: ", cmd->argv[0]); /* Outputs suitable error message when a process doesn't spawn */
                 }
 
                 posix_spawnattr_destroy(&child_spawn_attr);
@@ -736,6 +769,7 @@ execute_command_line(struct ast_command_line *cline)
 int main(int ac, char *av[])
 {
     int opt;
+    using_history(); /* Initializes history's variables. */
 
     /* Process command-line arguments. See getopt(3) */
     while ((opt = getopt(ac, av, "h")) > 0)
@@ -777,31 +811,35 @@ int main(int ac, char *av[])
         char *cmdline = readline(prompt);
         free(prompt);
 
-        if (cmdline == NULL) /* User typed EOF */
+        if (cmdline == NULL)
+        { /* User typed EOF */
             break;
+        }
+
+        // Ensures any history expansion errors will not be ran
+        bool execute = (check_expansion(&cmdline) == 0) ? true : false;
 
         struct ast_command_line *cline = ast_parse_command_line(cmdline);
-        free(cmdline);
-        if (cline == NULL) /* Error in command line */
+
+        if (cline == NULL)
+        { /* Error in command line */
             continue;
+        }
 
         if (list_empty(&cline->pipes))
         { /* User hit enter */
+            add_history(cmdline);
             ast_command_line_free(cline);
             continue;
         }
 
-        execute_command_line(cline);
-
-        /* Free the command line.
-         * This will free the ast_pipeline objects still contained
-         * in the ast_command_line.  Once you implement a job list
-         * that may take ownership of ast_pipeline objects that are
-         * associated with jobs you will need to reconsider how you
-         * manage the lifetime of the associated ast_pipelines.
-         * Otherwise, freeing here will cause use-after-free errors.
-         */
-        // ast_command_line_free(cline);
+        if (execute)
+        {
+            add_history(cmdline);
+            execute_command_line(cline);
+        }
+        free(cmdline);
+        ast_command_line_free(cline);
     }
     return 0;
 }
