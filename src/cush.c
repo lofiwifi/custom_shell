@@ -737,17 +737,10 @@ execute_command_line(struct ast_command_line *cline)
                 posix_spawnattr_setflags(&child_spawn_attr, POSIX_SPAWN_SETPGROUP);
                 posix_spawnattr_setpgroup(&child_spawn_attr, job->pgid);
 
-                int fd_in = 0;
-                int fd_out = 0;
-
                 // Redirect input.
                 if (pipe->iored_input != NULL && cList == list_begin(&pipe->commands))
                 {
-                    fd_in = open(pipe->iored_input, O_RDONLY);
-
                     posix_spawn_file_actions_addopen(&child_file_attr, 0, pipe->iored_input, O_RDONLY, 0666);
-
-                    close(fd_in);
                 }
 
                 // Redirect output.
@@ -756,15 +749,11 @@ execute_command_line(struct ast_command_line *cline)
                     // Append output.
                     if (pipe->append_to_output)
                     {
-                        fd_out = open(pipe->iored_output, O_WRONLY | O_CREAT | O_APPEND);
-
                         posix_spawn_file_actions_addopen(&child_file_attr, 1, pipe->iored_output, O_WRONLY | O_CREAT | O_APPEND, 0666);
                     }
                     // Overwrite output.
                     else
                     {
-                        fd_out = open(pipe->iored_output, O_WRONLY | O_CREAT | O_TRUNC);
-
                         posix_spawn_file_actions_addopen(&child_file_attr, 1, pipe->iored_output, O_WRONLY | O_CREAT | O_TRUNC, 0666);
                     }
 
@@ -773,8 +762,6 @@ execute_command_line(struct ast_command_line *cline)
                     {
                         posix_spawn_file_actions_adddup2(&child_file_attr, 1, 2);
                     }
-
-                    close(fd_out);
                 }
 
                 // Linking pipe output.
