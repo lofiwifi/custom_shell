@@ -677,17 +677,25 @@ execute_command_line(struct ast_command_line *cline)
                 // Redirect output.
                 if (pipe->iored_output != NULL && cList == list_end(&pipe->commands)->prev)
                 {
+                    // Append output.
                     if (pipe->append_to_output)
                     {
                         fd_out = open(pipe->iored_output, O_WRONLY | O_CREAT | O_APPEND);
 
                         posix_spawn_file_actions_addopen(&child_file_attr, 1, pipe->iored_output, O_WRONLY | O_CREAT | O_APPEND, 0666);
                     }
+                    // Overwrite output.
                     else
                     {
                         fd_out = open(pipe->iored_output, O_WRONLY | O_CREAT | O_TRUNC);
 
                         posix_spawn_file_actions_addopen(&child_file_attr, 1, pipe->iored_output, O_WRONLY | O_CREAT | O_TRUNC, 0666);
+                    }
+
+                    // >& implementation.
+                    if (cmd->dup_stderr_to_stdout)
+                    {
+                        posix_spawn_file_actions_adddup2(&child_file_attr, 1, 2);
                     }
 
                     close(fd_out);
@@ -715,16 +723,6 @@ execute_command_line(struct ast_command_line *cline)
                 extern char **environ;
                 if (posix_spawnp(&cpid, cmd->argv[0], &child_file_attr, &child_spawn_attr, &cmd->argv[0], environ) == 0)
                 {
-                    if (fd_in)
-                    {
-                        close(fd_in);
-                    }
-
-                    if (fd_out)
-                    {
-                        close(fd_out);
-                    }
-
                     /* If this spawn created a new process group, store the PGID in the job's PGID field.
                        Give new foreground jobs terminal access. Output job message if it's a background job. */
                     if (job->pgid == 0)
