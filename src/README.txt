@@ -14,7 +14,7 @@ Important Notes
 ---------------
 <Any important notes about your system>
 
-
+-Builtins do not work with pipes and redirection
 
 Description of Base Functionality
 ---------------------------------
