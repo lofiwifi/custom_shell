@@ -12,8 +12,9 @@ Execute cush with "./cush" from the command line.
 
 Important Notes
 ---------------
-<Any important notes about your system>
-
+Includes the built-in command history and a 
+custom prompt implementation displaying username, hostname
+and current directory.
 -Builtins do not work with pipes and redirection
 
 Description of Base Functionality
@@ -95,3 +96,10 @@ history
    both the standard event designators via GNU History Library, and
    scrolling through past entered commands via the arrow keys
    on the command line.
+
+custom prompt
+ - custom prompt implemented. Obtains strings containing the 
+   current user's username, the current truncated rlogin hostname, 
+   and the current directory via getlogin(), gethostname(), getcwd(), 
+   and snprintf() functions. Changes with user, hostname and current
+   directory.

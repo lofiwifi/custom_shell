@@ -19,6 +19,7 @@
 #include <stdio.h>
 #include <fcntl.h>
 #include <readline/history.h>
+#include <linux/limits.h>
 
 /* Since the handed out code contains a number of unused functions. */
 #pragma GCC diagnostic ignored "-Wunused-function"
@@ -44,6 +45,10 @@ static void kill_builtin(int jid, struct job *job);
 static void history_builtin(char *arg);
 static int check_expansion(char **argv);
 
+char* get_machine(void);
+char* get_only_current_dir(void);
+
+
 static void
 usage(char *progname)
 {
@@ -54,11 +59,82 @@ usage(char *progname)
     exit(EXIT_SUCCESS);
 }
 
+/* Returns a dynamically-allocated string containing the rlogin machine
+   that the shell is running on. If an error occurs, it will return it
+   through the dynamically-allocated string. The string returned must be
+   freed after use. */
+char* get_machine() {
+    char buf[PATH_MAX];
+    /* Checks for errors with obtaining hostname. */
+    if (gethostname(buf, sizeof(buf)) != 0) {
+        return strdup("Error: hostname could not be obtained.");
+    }
+
+    // Find how many characters are in the machine name.
+    int machine_chars = -1;
+    for (int i = 0; (i < sizeof(buf) && buf[i] != '\0'); i++) {
+        if (buf[i] == '.') {
+            machine_chars = i;
+            break;
+        }
+    }
+
+    /* Checks for errors with finding the '.' in the hostname. */
+    if (machine_chars == -1) {
+        return strdup("Error: hostname could not be parsed.");
+    }
+
+    // Returns truncated hostname containing only the name of the machine.
+    char* name = calloc(machine_chars + 1, sizeof(char));
+    snprintf(name, machine_chars + 1, "%s", buf);
+    return name; 
+}
+
+/* Obtains only the current directory, not the entire cwd path. Returns it
+   in a dynamically-allocated string that needs to be freed after use by
+   the caller. It will return an error message through a dynamically-
+   allocated string if an error occurs. */
+char* get_only_current_dir() {
+
+    char* cwd; 
+    if ((cwd = getcwd(NULL, 0)) == NULL) { // Checks for any errors with obtaining cwd.
+        return strdup("Error: current working directory could not be obtained.");
+    }
+
+    // Obtains the index within cwd where the last directory of the cwd is contained.
+    int dir_index = -1;
+    for (int i = strlen(cwd) - 1; i >= 0; i--) {
+        if (cwd[i] == '/') {
+            dir_index = i + 1;
+            break;
+        }
+    }
+
+    if (dir_index == -1) { // Checks for parsing errors.
+        return strdup("Error: current working directory could not be parsed.");
+    }
+
+    // Allocates a null-terminated string for the directory and returns it. 
+    char* dir = calloc(strlen(cwd) - dir_index + 1, sizeof(char));
+    snprintf(dir, strlen(cwd) - dir_index + 1, "%s", &cwd[dir_index]);
+    free(cwd);
+    return dir;
+}
+
 /* Build a prompt */
 static char *
 build_prompt(void)
 {
-    return strdup("cush> ");
+    char prompt[PATH_MAX];
+    
+    char* machine = get_machine();
+    char* directory = get_only_current_dir();
+    char* login = getlogin();
+    snprintf(prompt, sizeof(prompt), "%s@%s %s> ", login, machine, directory);
+
+    free(machine);
+    free(directory);
+    return strdup(prompt);
 }
 
 enum job_status
