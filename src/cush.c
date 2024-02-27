@@ -46,10 +46,7 @@ static void kill_builtin(int jid, struct job *job);
 static void history_builtin(char *arg);
 static int check_expansion(char **argv);
 
-<<<<<<< HEAD
 // Custom Prompt function prototypes
-=======
->>>>>>> a1f83a8770c68badb334b2885277dba1c89b3cee
 char *get_machine(void);
 char *get_only_current_dir(void);
 
