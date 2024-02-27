@@ -5,8 +5,6 @@ Ryan Erickson
 
 How to execute the shell
 ------------------------
-<describe how to execute from the command line>
-
 Run cush from its directory or add its directory to PATH.
 Execute cush with "./cush" from the command line.
 
@@ -19,9 +17,6 @@ and current directory.
 
 Description of Base Functionality
 ---------------------------------
-<describe your IMPLEMENTATION of the following commands:
-jobs, fg, bg, kill, stop, \ˆC, \ˆZ >
-
 jobs
 uses the given job list to iterate through all active jobs
 and print their information. If a job being iterated has a 
@@ -62,13 +57,8 @@ identifies it as a SIGSTP signal. We then change job status to STOPPED, save the
 state, set our termstate_saved field in the job to TRUE, print the job to the terminal
 and return terminal control to the shell.
 
->
-
 Description of Extended Functionality
 -------------------------------------
-<describe your IMPLEMENTATION of the following functionality:
-I/O, Pipes, Exclusive Access >
-
 I/O
 Makes a call to addopen and sets stdin to iored_input
 Makes a call to addopen and sets stdout to iored_output,
@@ -81,8 +71,10 @@ if dup_stderr_to_stdout, link stderr as well,
 afterwards closes all fds in the matrix
 
 Exclusive Access
-
->
+Ensures that any background process that stops to request terminal access
+is marked with the status NEEDSTERMINAL. The fg built-in function
+controls terminal state when giving the terminal back to a process group,
+sends the continue signal to the group, and waits for the job to complete.
 
 List of Additional Builtins Implemented
 ---------------------------------------
