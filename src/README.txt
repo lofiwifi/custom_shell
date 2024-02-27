@@ -15,7 +15,7 @@ Important Notes
 Includes the built-in command history and a 
 custom prompt implementation displaying username, hostname
 and current directory.
-
+-Builtins do not work with pipes and redirection
 
 Description of Base Functionality
 ---------------------------------
