@@ -20,6 +20,7 @@
 #include <fcntl.h>
 #include <readline/history.h>
 #include <linux/limits.h>
+#include <errno.h>
 
 /* Since the handed out code contains a number of unused functions. */
 #pragma GCC diagnostic ignored "-Wunused-function"
@@ -45,7 +46,10 @@ static void kill_builtin(int jid, struct job *job);
 static void history_builtin(char *arg);
 static int check_expansion(char **argv);
 
+<<<<<<< HEAD
 // Custom Prompt function prototypes
+=======
+>>>>>>> a1f83a8770c68badb334b2885277dba1c89b3cee
 char *get_machine(void);
 char *get_only_current_dir(void);
 
@@ -188,6 +192,8 @@ struct pid
 static struct list job_list;
 
 static struct job *jid2job[MAXJOBS];
+
+static int err;
 
 /* Return job corresponding to jid */
 static struct job *
@@ -454,7 +460,11 @@ handle_child_status(pid_t pid, int status)
     if (job == NULL)
     {
         char *out = "ERROR: given PID is not associated with a job.\n";
-        write(1, out, strlen(out));
+        err = write(1, out, strlen(out));
+        if (err == -1)
+        {
+            printf("%s", strerror(errno));
+        }
         return;
     }
 
@@ -518,13 +528,21 @@ handle_child_status(pid_t pid, int status)
         /* User terminates process with kill command OR user terminates process with kill -9 */
         case SIGTERM || SIGKILL:
             buf = strsignal(WTERMSIG(status));
-            write(1, buf, strlen(buf));
+            err = write(1, buf, strlen(buf));
+            if (err == -1)
+            {
+                printf("%s", strerror(errno));
+            }
             break;
 
         /* General case, process has been terminated */
         default:
             buf = strsignal(WTERMSIG(status));
-            write(1, buf, strlen(buf));
+            err = write(1, buf, strlen(buf));
+            if (err == -1)
+            {
+                printf("%s", strerror(errno));
+            }
         }
     }
 }
@@ -565,7 +583,11 @@ stop_builtin(int jid, struct job *job)
         return;
     }
 
-    killpg(to_stop->pgid, SIGSTOP);
+    err = killpg(to_stop->pgid, SIGSTOP);
+    if (err == -1)
+    {
+        printf("%s", strerror(errno));
+    }
 }
 
 /* Foreground fg built-in shell function. Places the job of jid arg in
@@ -588,7 +610,11 @@ fg_builtin(char *arg)
     {
         termstate_give_terminal_to(&job->saved_tty_state, job->pgid);
     }
-    killpg(job->pgid, SIGCONT);
+    err = killpg(job->pgid, SIGCONT);
+    if (err == -1)
+    {
+        printf("%s", strerror(errno));
+    }
     wait_for_job(job);
 }
 
@@ -601,7 +627,11 @@ bg_builtin(char *arg)
     job->status = BACKGROUND;
     printf("[%d] %d\n", job->jid, job->pgid);
     termstate_give_terminal_back_to_shell();
-    killpg(job->pgid, SIGCONT);
+    err = killpg(job->pgid, SIGCONT);
+    if (err == -1)
+    {
+        printf("%s", strerror(errno));
+    }
 }
 
 /* Kill built-in shell function. Kills the job specified by jid. */
@@ -616,7 +646,11 @@ kill_builtin(int jid, struct job *job)
         return;
     }
 
-    killpg(to_kill->pgid, SIGTERM);
+    err = killpg(to_kill->pgid, SIGTERM);
+    if (err == -1)
+    {
+        printf("%s", strerror(errno));
+    }
 }
 
 /* History built-in shell function. Displays past command history and allows
@@ -724,7 +758,11 @@ execute_command_line(struct ast_command_line *cline)
         for (int i = 0; i < num_pipes; i++)
         {
             int currfds[2];
-            pipe2(currfds, O_CLOEXEC);
+            err = pipe2(currfds, O_CLOEXEC);
+            if (err == -1)
+            {
+                printf("%s", strerror(errno));
+            }
 
             pipefds[i][0] = currfds[0];
             pipefds[i][1] = currfds[1];
@@ -744,17 +782,37 @@ execute_command_line(struct ast_command_line *cline)
             {
                 posix_spawn_file_actions_t child_file_attr;
                 posix_spawnattr_t child_spawn_attr;
-                posix_spawnattr_init(&child_spawn_attr);
-                posix_spawn_file_actions_init(&child_file_attr);
+                err = posix_spawnattr_init(&child_spawn_attr);
+                if (err != 0)
+                {
+                    printf("%s", strerror(errno));
+                }
+                err = posix_spawn_file_actions_init(&child_file_attr);
+                if (err != 0)
+                {
+                    printf("%s", strerror(errno));
+                }
 
                 // Spawn the process as part of a process group. If the PGID of the job is 0, create a new group.
-                posix_spawnattr_setflags(&child_spawn_attr, POSIX_SPAWN_SETPGROUP);
-                posix_spawnattr_setpgroup(&child_spawn_attr, job->pgid);
+                err = posix_spawnattr_setflags(&child_spawn_attr, POSIX_SPAWN_SETPGROUP);
+                if (err != 0)
+                {
+                    printf("%s", strerror(errno));
+                }
+                err = posix_spawnattr_setpgroup(&child_spawn_attr, job->pgid);
+                if (err != 0)
+                {
+                    printf("%s", strerror(errno));
+                }
 
                 // Redirect input.
                 if (pipe->iored_input != NULL && cList == list_begin(&pipe->commands))
                 {
-                    posix_spawn_file_actions_addopen(&child_file_attr, 0, pipe->iored_input, O_RDONLY, 0666);
+                    err = posix_spawn_file_actions_addopen(&child_file_attr, 0, pipe->iored_input, O_RDONLY, 0666);
+                    if (err != 0)
+                    {
+                        printf("%s", strerror(errno));
+                    }
                 }
 
                 // Redirect output.
@@ -763,36 +821,60 @@ execute_command_line(struct ast_command_line *cline)
                     // Append output.
                     if (pipe->append_to_output)
                     {
-                        posix_spawn_file_actions_addopen(&child_file_attr, 1, pipe->iored_output, O_WRONLY | O_CREAT | O_APPEND, 0666);
+                        err = posix_spawn_file_actions_addopen(&child_file_attr, 1, pipe->iored_output, O_WRONLY | O_CREAT | O_APPEND, 0666);
+                        if (err != 0)
+                        {
+                            printf("%s", strerror(errno));
+                        }
                     }
                     // Overwrite output.
                     else
                     {
-                        posix_spawn_file_actions_addopen(&child_file_attr, 1, pipe->iored_output, O_WRONLY | O_CREAT | O_TRUNC, 0666);
+                        err = posix_spawn_file_actions_addopen(&child_file_attr, 1, pipe->iored_output, O_WRONLY | O_CREAT | O_TRUNC, 0666);
+                        if (err != 0)
+                        {
+                            printf("%s", strerror(errno));
+                        }
                     }
 
                     // >& implementation.
                     if (cmd->dup_stderr_to_stdout)
                     {
-                        posix_spawn_file_actions_adddup2(&child_file_attr, 1, 2);
+                        err = posix_spawn_file_actions_adddup2(&child_file_attr, 1, 2);
+                        if (err != 0)
+                        {
+                            printf("%s", strerror(errno));
+                        }
                     }
                 }
 
                 // Linking pipe output.
                 if (num_pipes > 0 && cList != list_end(&pipe->commands)->prev)
                 {
-                    posix_spawn_file_actions_adddup2(&child_file_attr, pipefds[cmd_index][1], 1);
+                    err = posix_spawn_file_actions_adddup2(&child_file_attr, pipefds[cmd_index][1], 1);
+                    if (err != 0)
+                    {
+                        printf("%s", strerror(errno));
+                    }
 
                     if (cmd->dup_stderr_to_stdout)
                     {
-                        posix_spawn_file_actions_adddup2(&child_file_attr, pipefds[cmd_index][1], 2);
+                        err = posix_spawn_file_actions_adddup2(&child_file_attr, pipefds[cmd_index][1], 2);
+                        if (err != 0)
+                        {
+                            printf("%s", strerror(errno));
+                        }
                     }
                 }
 
                 // Linking pipe input.
                 if (num_pipes > 0 && cList != list_begin(&pipe->commands))
                 {
-                    posix_spawn_file_actions_adddup2(&child_file_attr, pipefds[cmd_index - 1][0], 0);
+                    err = posix_spawn_file_actions_adddup2(&child_file_attr, pipefds[cmd_index - 1][0], 0);
+                    if (err != 0)
+                    {
+                        printf("%s", strerror(errno));
+                    }
                 }
 
                 /* Spawn process and add the process to the job PID list if the spawn is successful. Otherwise, output command not found error. */
@@ -811,7 +893,11 @@ execute_command_line(struct ast_command_line *cline)
                         }
                         else
                         {
-                            tcsetpgrp(termstate_get_tty_fd(), job->pgid);
+                            err = tcsetpgrp(termstate_get_tty_fd(), job->pgid);
+                            if (err == -1)
+                            {
+                                printf("%s", strerror(errno));
+                            }
                         }
                     }
                     add_pid_to_job(cpid, job);
@@ -821,8 +907,16 @@ execute_command_line(struct ast_command_line *cline)
                     utils_error("%s: ", cmd->argv[0]); /* Outputs suitable error message when a process doesn't spawn */
                 }
 
-                posix_spawnattr_destroy(&child_spawn_attr);
-                posix_spawn_file_actions_destroy(&child_file_attr);
+                err = posix_spawnattr_destroy(&child_spawn_attr);
+                if (err != 0)
+                {
+                    printf("%s", strerror(errno));
+                }
+                err = posix_spawn_file_actions_destroy(&child_file_attr);
+                if (err != 0)
+                {
+                    printf("%s", strerror(errno));
+                }
             }
 
             cmd_index++;
@@ -831,8 +925,16 @@ execute_command_line(struct ast_command_line *cline)
         // Close pipes.
         for (int i = 0; i < num_pipes; i++)
         {
-            close(pipefds[i][0]);
-            close(pipefds[i][1]);
+            err = close(pipefds[i][0]);
+            if (err == -1)
+            {
+                printf("%s", strerror(errno));
+            }
+            err = close(pipefds[i][1]);
+            if (err == -1)
+            {
+                printf("%s", strerror(errno));
+            }
         }
 
         // After all processes have been spawned, wait for the job if it is foreground.
