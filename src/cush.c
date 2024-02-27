@@ -789,7 +789,7 @@ execute_command_line(struct ast_command_line *cline)
                 }
 
                 // Spawn the process as part of a process group. If the PGID of the job is 0, create a new group.
-                err = (&child_spawn_attr, POSIX_SPAWN_SETPGROUP);
+                err = posix_spawnattr_setflags(&child_spawn_attr, POSIX_SPAWN_SETPGROUP);
                 if (err != 0)
                 {
                     printf("%s", strerror(errno));
