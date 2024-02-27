@@ -87,3 +87,5 @@ sendline("!100")
 expect_exact("!100: event not found", "Absolute line substitution was not handled properly.")
 sendline("!-100")
 expect_exact("!-100: event not found", "Relative line substitution was not handled properly.")
+
+test_success()
