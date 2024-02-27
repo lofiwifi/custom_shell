@@ -498,9 +498,12 @@ handle_child_status(pid_t pid, int status)
             break;
 
         /* If non-foreground process wants terminal access */
-        case (SIGTTOU || SIGTTIN):
-            job->status = FOREGROUND;
-            termstate_give_terminal_to(&job->saved_tty_state, job->pgid);
+        case SIGTTOU:
+            job->status = NEEDSTERMINAL;
+            break;
+
+        case SIGTTIN:
+            job->status = NEEDSTERMINAL;
         }
     }
     else if (WIFSIGNALED(status))
